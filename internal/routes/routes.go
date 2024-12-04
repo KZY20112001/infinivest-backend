@@ -1,13 +1,21 @@
 package routes
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 )
 
 func RegisterRoutes(router *gin.Engine) {
-	router.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": "hello world"})
-	})
+
+	// user routes
+	// userGroup := router.Group("/user")
+	// {
+
+	// }
+
+	// // profile routes
+	// profileGroup := router.Group("/profile")
+	// {
+
+	// }
+
 }
