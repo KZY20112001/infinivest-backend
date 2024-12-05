@@ -1,49 +1,50 @@
 package db
 
 import (
-	"context"
-	"database/sql"
 	"fmt"
 	"log"
+	"os"
 
-	_ "github.com/lib/pq" // Postgres driver
 	"github.com/redis/go-redis/v9"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-var ctx = context.Background()
+var DB *gorm.DB
+var Redis *redis.Client
 
-// ConnectToPostgres connects to the PostgreSQL database
-func ConnectToPostgres() (*sql.DB, error) {
-	fmt.Println("Starting connection with Postgres Db")
-	db, err := sql.Open("postgres", "user=admin password=admin dbname=postgres_db sslmode=disable port=5432")
+func ConnectToPostgres() {
+	log.Println("Starting connection with Postgres Db")
+
+	host := os.Getenv("POSTGRES_HOST")
+	user := os.Getenv("POSTGRES_USER")
+	password := os.Getenv("POSTGRES_PASSWORD")
+	db := os.Getenv("POSTGRES_DB")
+	port := os.Getenv("POSTGRES_PORT")
+	dsn := fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		host, user, password, db, port,
+	)
+
+	var err error
+	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+
 	if err != nil {
-		return nil, err
+		log.Fatal("Failed to connect to db")
 	}
+	log.Println("Successfully connected to Postgres Db")
 
-	// Check the connection
-	if err = db.Ping(); err != nil {
-		log.Println("DB Ping Failed")
-		return nil, err
-	}
-
-	log.Println("DB Connection started successfully")
-	return db, nil
 }
 
-// ConnectToRedis connects to the Redis server
-func ConnectToRedis() (*redis.Client, error) {
-	client := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379", // Redis server address
-		Password: "",               // No password by default
-		DB:       0,                // Default DB
+func ConnectToRedis() {
+	log.Println("Starting connection with Redis Db")
+	host := os.Getenv("REDIS_HOST")
+	port := os.Getenv("REDIS_PORT")
+	address := fmt.Sprintf("%s:%s", host, port)
+	Redis = redis.NewClient(&redis.Options{
+		Addr:     address,
+		Password: "",
+		DB:       0,
 	})
-
-	// Check connection
-	if err := client.Ping(ctx).Err(); err != nil {
-		log.Println("Redis Ping Failed")
-		return nil, err
-	}
-
-	log.Println("Redis Connection started successfully")
-	return client, nil
+	log.Println("Successfully connected to Redis Db")
 }
