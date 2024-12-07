@@ -11,6 +11,8 @@ services:
       - "5432:5432"         
     volumes:
       - postgres_data:/var/lib/postgresql/data  
+    networks:
+      - infinivest
 
   redis:
     image: redis        
@@ -19,7 +21,15 @@ services:
       - "6379:6379"         
     volumes:
       - redis_data:/data    
+    networks:
+      - infinivest
 
+    
 volumes:
   postgres_data:            # Volume for PostgreSQL data persistence
   redis_data:               # Volume for Redis data persistence
+
+
+networks:
+  infinivest:
+    name: infinivest

@@ -2,7 +2,6 @@ package db
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/redis/go-redis/v9"
@@ -10,12 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-var DB *gorm.DB
-var Redis *redis.Client
-
-func ConnectToPostgres() {
-	log.Println("Starting connection with Postgres Db")
-
+func ConnectToPostgres() (*gorm.DB, error) {
 	host := os.Getenv("POSTGRES_HOST")
 	user := os.Getenv("POSTGRES_USER")
 	password := os.Getenv("POSTGRES_PASSWORD")
@@ -25,26 +19,15 @@ func ConnectToPostgres() {
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
 		host, user, password, db, port,
 	)
-
-	var err error
-	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
-
-	if err != nil {
-		log.Fatal("Failed to connect to db")
-	}
-	log.Println("Successfully connected to Postgres Db")
-
+	return gorm.Open(postgres.Open(dsn), &gorm.Config{})
 }
 
-func ConnectToRedis() {
-	log.Println("Starting connection with Redis Db")
-	host := os.Getenv("REDIS_HOST")
-	port := os.Getenv("REDIS_PORT")
-	address := fmt.Sprintf("%s:%s", host, port)
-	Redis = redis.NewClient(&redis.Options{
+func ConnectToRedis() *redis.Client {
+	address := fmt.Sprintf("%s:%s", os.Getenv("REDIS_HOST"), os.Getenv("REDIS_PORT"))
+	redis := redis.NewClient(&redis.Options{
 		Addr:     address,
 		Password: "",
 		DB:       0,
 	})
-	log.Println("Successfully connected to Redis Db")
+	return redis
 }
