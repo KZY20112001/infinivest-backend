@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/KZY20112001/infinivest-backend/internal/db"
+	"github.com/KZY20112001/infinivest-backend/internal/models"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -68,4 +69,6 @@ func SetupDB() {
 	}
 
 	log.Println("Connected to Postgres and Redis successfully")
+
+	DB.AutoMigrate(&models.User{}, &models.Profile{})
 }

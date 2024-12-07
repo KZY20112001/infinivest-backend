@@ -10,7 +10,8 @@ func RegisterRoutes(router *gin.Engine) {
 	// user routes
 	userGroup := router.Group("/user")
 	{
-		userGroup.GET("/signup", handlers.SignUp)
+		userGroup.POST("/signup", handlers.SignUp)
+		userGroup.GET("/get/:email", handlers.GetUser)
 	}
 
 	// profile routes

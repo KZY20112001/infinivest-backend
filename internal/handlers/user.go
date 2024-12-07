@@ -12,6 +12,7 @@ func SignUp(c *gin.Context) {
 	var dto dto.SignUpRequest
 	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	if err := app.UserService.SignUp(dto); err != nil {
@@ -23,14 +24,11 @@ func SignUp(c *gin.Context) {
 }
 
 func GetUser(c *gin.Context) {
-	var dto dto.GetUserRequest
-	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-	}
-
-	user, err := app.UserService.GetUser(dto)
+	email := c.Param("email")
+	user, err := app.UserService.GetUser(email)
 	if err != nil {
 		HandleError(c, err)
+		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"user": user})
 

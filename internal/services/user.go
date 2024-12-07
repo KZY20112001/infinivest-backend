@@ -33,6 +33,6 @@ func (us *UserService) SignUp(dto dto.SignUpRequest) error {
 	return nil
 }
 
-func (us *UserService) GetUser(dto dto.GetUserRequest) (*models.User, error) {
-	return us.repo.GetUser(dto.Email)
+func (us *UserService) GetUser(email string) (*models.User, error) {
+	return us.repo.GetUser(email)
 }
