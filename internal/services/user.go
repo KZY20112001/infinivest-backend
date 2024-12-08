@@ -58,7 +58,7 @@ func (us *UserService) SignIn(userDto dto.AuthRequest) (*dto.TokenResponse, erro
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(userDto.Password))
 
 	if err != nil {
-		return nil, global.ErrInvalidCredentials
+		return nil, global.ErrNotFound
 	}
 	return us.generateTokens(user.Email)
 }

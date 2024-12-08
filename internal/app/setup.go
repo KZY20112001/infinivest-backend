@@ -65,7 +65,6 @@ func SetupDB() {
 	}
 
 	log.Println("Connected to Postgres and Redis successfully")
-
 	postgresDB.AutoMigrate(&models.User{}, &models.Profile{})
 }
 
