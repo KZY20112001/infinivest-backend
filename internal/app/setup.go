@@ -1,7 +1,6 @@
 package app
 
 import (
-	"errors"
 	"log"
 	"sync"
 
@@ -13,8 +12,8 @@ import (
 )
 
 var (
-	DB    *gorm.DB
-	Redis *redis.Client
+	postgresDB  *gorm.DB
+	redisClient *redis.Client
 )
 
 func LoadEnv() {
@@ -37,26 +36,23 @@ func SetupDB() {
 	// Connect to Postgres
 	go func() {
 		defer wg.Done()
-		log.Println("Connecting to Postgres DB...")
 		var err error
-		DB, err = db.ConnectToPostgres()
+		postgresDB, err = db.ConnectToPostgres()
 		if err != nil {
 			errCh <- err
 			return
 		}
-		log.Println("Successfully connected to Postgres DB")
 	}()
 
 	// Connect to Redis
 	go func() {
 		defer wg.Done()
-		log.Println("Connecting to Redis...")
-		Redis = db.ConnectToRedis() // Assuming this function already handles errors internally
-		if Redis == nil {
-			errCh <- errors.New("failed to connect to Redis")
+		var err error
+		redisClient, err = db.ConnectToRedis() // Assuming this function already handles errors internally
+		if err != nil {
+			errCh <- err
 			return
 		}
-		log.Println("Successfully connected to Redis")
 	}()
 
 	// Wait for both tasks to complete
@@ -70,5 +66,14 @@ func SetupDB() {
 
 	log.Println("Connected to Postgres and Redis successfully")
 
-	DB.AutoMigrate(&models.User{}, &models.Profile{})
+	postgresDB.AutoMigrate(&models.User{}, &models.Profile{})
+}
+
+func CloseDB() {
+	redisClient.Close()
+	db, err := postgresDB.DB()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer db.Close()
 }

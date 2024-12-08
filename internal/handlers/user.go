@@ -9,18 +9,36 @@ import (
 )
 
 func SignUp(c *gin.Context) {
-	var dto dto.SignUpRequest
+	var dto dto.AuthRequest
 	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := app.UserService.SignUp(dto); err != nil {
+	tokens, err := app.UserService.SignUp(dto)
+	if err != nil {
 		HandleError(c, err)
+		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Sign Up Successful"})
+	c.JSON(http.StatusCreated, gin.H{"tokens": tokens})
 
+}
+
+func SignIn(c *gin.Context) {
+	var dto dto.AuthRequest
+	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	tokens, err := app.UserService.SignIn(dto)
+	if err != nil {
+		HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"tokens": tokens})
 }
 
 func GetUser(c *gin.Context) {

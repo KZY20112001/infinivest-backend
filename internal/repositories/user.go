@@ -55,5 +55,6 @@ func (ptr *PostgresUserRepo) GetUser(email string) (*models.User, error) {
 		}
 		return nil, err
 	}
+
 	return &user, nil
 }
