@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"os"
 	"time"
 
@@ -63,6 +64,19 @@ func (us *UserService) SignIn(userDto dto.AuthRequest) (*dto.TokenResponse, erro
 	return us.generateTokens(user.Email)
 }
 
+func (us *UserService) RefreshRequest(tokenDto dto.RefreshRequest) (*dto.TokenResponse, error) {
+	email, err := authenticateToken(tokenDto.RefreshToken, RefreshToken)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = us.GetUser(email)
+	if err != nil {
+		return nil, err
+	}
+	return us.generateTokens(email)
+}
+
 func (us *UserService) GetUser(email string) (*models.User, error) {
 	return us.repo.GetUser(email)
 }
@@ -111,4 +125,39 @@ func generateJWT(email string, tokenType TokenType) (string, error) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(os.Getenv("TOKEN_SECRET")))
+}
+
+func authenticateToken(tokenString string, expectedType TokenType) (string, error) {
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return []byte(os.Getenv("TOKEN_SECRET")), nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		if claims["type"] != string(expectedType) {
+			return "", errors.New("invalid token type")
+		}
+
+		if exp, ok := claims["exp"].(float64); ok {
+			if time.Unix(int64(exp), 0).Before(time.Now()) {
+				return "", errors.New("token has expired")
+			}
+		} else {
+			return "", errors.New("invalid expiration time")
+		}
+
+		if email, ok := claims["email"].(string); ok {
+			return email, nil
+		}
+		return "", errors.New("email claim is missing")
+	}
+
+	return "", errors.New("invalid token")
 }

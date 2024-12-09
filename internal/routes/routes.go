@@ -12,6 +12,7 @@ func RegisterRoutes(router *gin.Engine) {
 	{
 		userGroup.POST("/signup", handlers.SignUp)
 		userGroup.POST("/signin", handlers.SignIn)
+		userGroup.POST("/refresh", handlers.RefreshToken)
 		userGroup.GET("/get/:email", handlers.GetUser)
 	}
 

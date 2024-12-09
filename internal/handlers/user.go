@@ -41,6 +41,21 @@ func SignIn(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"tokens": tokens})
 }
 
+func RefreshToken(c *gin.Context) {
+	var dto dto.RefreshRequest
+	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	tokens, err := app.UserService.RefreshRequest(dto)
+	if err != nil {
+		HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"tokens": tokens})
+}
+
 func GetUser(c *gin.Context) {
 	email := c.Param("email")
 	user, err := app.UserService.GetUser(email)
