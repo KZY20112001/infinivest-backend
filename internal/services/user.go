@@ -15,17 +15,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type TokenType string
-
 type UserService struct {
 	repo  repositories.UserRepo
 	redis *cache.RedisCache
 }
-
-const (
-	AccessToken  TokenType = "ACCESS"
-	RefreshToken TokenType = "REFRESH"
-)
 
 var ctx = context.Background()
 
@@ -65,7 +58,7 @@ func (us *UserService) SignIn(userDto dto.AuthRequest) (*dto.TokenResponse, erro
 }
 
 func (us *UserService) RefreshRequest(tokenDto dto.RefreshRequest) (*dto.TokenResponse, error) {
-	email, err := authenticateToken(tokenDto.RefreshToken, RefreshToken)
+	email, err := authenticateToken(tokenDto.RefreshToken, global.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -83,12 +76,12 @@ func (us *UserService) GetUser(email string) (*models.User, error) {
 
 func (us *UserService) generateTokens(email string) (*dto.TokenResponse, error) {
 
-	accessToken, err := generateJWT(email, AccessToken)
+	accessToken, err := generateJWT(email, global.AccessToken)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := generateJWT(email, RefreshToken)
+	refreshToken, err := generateJWT(email, global.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -108,12 +101,12 @@ func (us *UserService) generateTokens(email string) (*dto.TokenResponse, error) 
 	}, nil
 }
 
-func generateJWT(email string, tokenType TokenType) (string, error) {
+func generateJWT(email string, tokenType global.TokenType) (string, error) {
 	var t int64 = 0
 	switch tokenType {
-	case AccessToken:
+	case global.AccessToken:
 		t = time.Now().Add(2 * time.Hour).Unix()
-	case RefreshToken:
+	case global.RefreshToken:
 		t = time.Now().Add(8 * time.Hour).Unix()
 	default:
 		t = 0
@@ -127,7 +120,7 @@ func generateJWT(email string, tokenType TokenType) (string, error) {
 	return token.SignedString([]byte(os.Getenv("TOKEN_SECRET")))
 }
 
-func authenticateToken(tokenString string, expectedType TokenType) (string, error) {
+func authenticateToken(tokenString string, expectedType global.TokenType) (string, error) {
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
