@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/KZY20112001/infinivest-backend/internal/global"
+	"github.com/KZY20112001/infinivest-backend/internal/constants"
 
 	"github.com/gin-gonic/gin"
 )
@@ -11,13 +11,13 @@ import (
 func HandleError(c *gin.Context, err error) {
 	if err != nil {
 		switch err {
-		case global.ErrDuplicate:
+		case constants.ErrDuplicate:
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		case global.ErrNotFound:
+		case constants.ErrNotFound:
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		case global.ErrInternal:
+		case constants.ErrInternal:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		case global.ErrNil:
+		case constants.ErrNil:
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		default:
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

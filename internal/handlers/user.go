@@ -56,9 +56,9 @@ func RefreshToken(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"tokens": tokens})
 }
 
-func GetUser(c *gin.Context) {
-	email := c.Param("email")
-	user, err := app.UserService.GetUser(email)
+func GetCurrentUser(c *gin.Context) {
+	id := c.GetUint("id")
+	user, err := app.UserService.GetUser(id)
 	if err != nil {
 		HandleError(c, err)
 		return

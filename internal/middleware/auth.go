@@ -1,9 +1,9 @@
 package middleware
 
 import (
-	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,9 +43,6 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		if claims, ok := token.Claims.(jwt.MapClaims); ok {
-			log.Printf("exp value: %v, type: %T\n", claims["exp"], claims["exp"])
-			log.Println("now: ", time.Now())
-
 			if exp, ok := claims["exp"].(float64); ok {
 				if time.Unix(int64(exp), 0).Before(time.Now()) {
 					c.JSON(http.StatusUnauthorized, gin.H{"error": "Token has expired"})
@@ -68,7 +65,15 @@ func AuthMiddleware() gin.HandlerFunc {
 				c.Abort()
 				return
 			}
-			c.Set("email", claims["email"].(string))
+			if idStr, ok := claims["id"].(string); ok {
+				if id, err := strconv.ParseUint(idStr, 10, 32); err == nil {
+					c.Set("id", uint(id))
+				}
+			} else {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid ID"})
+				c.Abort()
+				return
+			}
 		} else {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
 			c.Abort()

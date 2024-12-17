@@ -14,7 +14,7 @@ func RegisterRoutes(router *gin.Engine) {
 		userGroup.POST("/signup", handlers.SignUp)
 		userGroup.POST("/signin", handlers.SignIn)
 		userGroup.POST("/refresh", handlers.RefreshToken)
-		userGroup.GET("/get/:email", middleware.AuthMiddleware(), handlers.GetUser)
+		userGroup.GET("", middleware.AuthMiddleware(), handlers.GetCurrentUser)
 	}
 
 	// profile routes
@@ -22,6 +22,8 @@ func RegisterRoutes(router *gin.Engine) {
 	profileGroup.Use(middleware.AuthMiddleware())
 	{
 		profileGroup.POST("/create", handlers.CreateProfile)
+		profileGroup.PUT("/update", handlers.UpdateProfile)
+		profileGroup.GET("/", handlers.GetProfile)
 	}
 
 }
