@@ -44,7 +44,7 @@ func (ptr *PostgresProfileRepo) UpdateProfile(updatedProfile *models.Profile) er
 
 func (ptr *PostgresProfileRepo) GetProfile(userID uint) (*models.Profile, error) {
 	var profile models.Profile
-	if err := ptr.db.Where("UserID = ?", userID).First(&profile).Error; err != nil {
+	if err := ptr.db.Preload("User").Where("user_id = ?", userID).First(&profile).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, constants.ErrNotFound
 		}

@@ -32,7 +32,6 @@ func main() {
 		Addr:    ":" + os.Getenv("PORT"),
 		Handler: r,
 	}
-
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed: %s\n", err)
