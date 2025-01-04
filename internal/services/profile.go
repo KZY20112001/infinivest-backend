@@ -6,16 +6,22 @@ import (
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 )
 
-type ProfileService struct {
+type ProfileService interface {
+	CreateProfile(userID uint, profileDto dto.ProfileRequest) error
+	UpdateProfile(userID uint, profileDto dto.ProfileRequest) error
+	GetProfile(userID uint) (*models.Profile, error)
+}
+
+type ProfileServiceImpl struct {
 	repo        repositories.ProfileRepo
 	userService UserService
 }
 
-func NewProfileService(pr repositories.ProfileRepo, us UserService) *ProfileService {
-	return &ProfileService{repo: pr, userService: us}
+func NewProfileServiceImpl(pr repositories.ProfileRepo, us UserService) *ProfileServiceImpl {
+	return &ProfileServiceImpl{repo: pr, userService: us}
 }
 
-func (ps *ProfileService) CreateProfile(userID uint, profileDto dto.ProfileRequest) error {
+func (ps *ProfileServiceImpl) CreateProfile(userID uint, profileDto dto.ProfileRequest) error {
 	user, err := ps.userService.GetUser(userID)
 	if err != nil {
 		return err
@@ -29,7 +35,7 @@ func (ps *ProfileService) CreateProfile(userID uint, profileDto dto.ProfileReque
 	return ps.repo.CreateProfile(&profile)
 }
 
-func (ps *ProfileService) UpdateProfile(userID uint, profileDto dto.ProfileRequest) error {
+func (ps *ProfileServiceImpl) UpdateProfile(userID uint, profileDto dto.ProfileRequest) error {
 	profile, err := ps.repo.GetProfile(userID)
 	if err != nil {
 		return err
@@ -39,6 +45,6 @@ func (ps *ProfileService) UpdateProfile(userID uint, profileDto dto.ProfileReque
 	return ps.repo.UpdateProfile(profile)
 }
 
-func (ps *ProfileService) GetProfile(userID uint) (*models.Profile, error) {
+func (ps *ProfileServiceImpl) GetProfile(userID uint) (*models.Profile, error) {
 	return ps.repo.GetProfile(userID)
 }

@@ -10,23 +10,50 @@ import (
 	"time"
 
 	"github.com/KZY20112001/infinivest-backend/internal/app"
+	"github.com/KZY20112001/infinivest-backend/internal/db"
+	"github.com/KZY20112001/infinivest-backend/internal/handlers"
+	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 	"github.com/KZY20112001/infinivest-backend/internal/routes"
+	"github.com/KZY20112001/infinivest-backend/internal/services"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+	"gorm.io/gorm"
+)
+
+var (
+	postgresDB  *gorm.DB
+	redisClient *redis.Client
 )
 
 func init() {
 	app.LoadEnv()
-	app.SetupDB()
-	app.InjectDependencies()
+
+	var err error
+	postgresDB, err = db.ConnectToPostgres()
+	if err != nil {
+		log.Fatalf("error in connecting to database: %v", err.Error())
+	}
+
+	redisClient, err = db.ConnectToRedis()
+	if err != nil {
+		log.Fatalf("error in connecting to redis: %v", err.Error())
+	}
 }
 
 func main() {
 	r := gin.Default()
-	routes.RegisterRoutes(r)
 
-	// Channel to listen for termination signals
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	redisCache := repositories.NewRedisCache(redisClient)
+	postgresUserRepo := repositories.NewPostgresUserRepo(postgresDB)
+	postgresProfileRepo := repositories.NewPostgresProfileRepo(postgresDB)
+
+	userService := services.NewUserServiceImpl(postgresUserRepo, redisCache)
+	profileService := services.NewProfileServiceImpl(postgresProfileRepo, userService)
+
+	userHandler := handlers.NewUserHandlerImpl(userService)
+	profileHandler := handlers.NewProfileHandlerImpl(profileService)
+
+	routes.RegisterRoutes(r, userHandler, profileHandler)
 
 	server := &http.Server{
 		Addr:    ":" + os.Getenv("PORT"),
@@ -38,20 +65,23 @@ func main() {
 		}
 	}()
 
-	// Block until a signal is received
+	// Wait for interrupt signal to gracefully shutdown the server with
+	// a timeout of 5 seconds.
+	quit := make(chan os.Signal, 1)
+	// kill (no param) default send syscall.SIGTERM
+	// kill -2 is syscall.SIGINT
+	// kill -9 is syscall.SIGKILL but can't be catch, so don't need add it
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("Shutting down server...")
 
-	// Gracefully shut down the server
+	// The context is used to inform the server it has 5 seconds to finish
+	// the request it is currently handling
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shut down: %s\n", err)
+		log.Fatal("Server forced to shutdown: ", err)
 	}
 
-	log.Println("Disconnecting from DB...")
-	app.CloseDB()
-
-	log.Println("Server exited gracefully")
+	log.Println("Server exiting")
 }

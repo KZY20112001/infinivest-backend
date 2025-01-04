@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/KZY20112001/infinivest-backend/internal/cache"
 	"github.com/KZY20112001/infinivest-backend/internal/constants"
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
@@ -16,20 +15,29 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type UserService struct {
+type UserService interface {
+	SignUp(userDto dto.AuthRequest) (*dto.TokenResponse, error)
+	SignIn(userDto dto.AuthRequest) (*dto.TokenResponse, error)
+	RefreshRequest(tokenDto dto.RefreshRequest) (*dto.TokenResponse, error)
+	GetUser(id uint) (*models.User, error)
+	GetUserByEmail(email string) (*models.User, error)
+	generateTokens(id uint) (*dto.TokenResponse, error)
+}
+
+type UserServiceImpl struct {
 	repo  repositories.UserRepo
-	redis *cache.RedisCache
+	cache repositories.Cache
 }
 
 var ctx = context.Background()
 
-func NewUserService(ur repositories.UserRepo, client *cache.RedisCache) *UserService {
-	return &UserService{
-		repo: ur, redis: client,
+func NewUserServiceImpl(ur repositories.UserRepo, cache repositories.Cache) *UserServiceImpl {
+	return &UserServiceImpl{
+		repo: ur, cache: cache,
 	}
 }
 
-func (us *UserService) SignUp(userDto dto.AuthRequest) (*dto.TokenResponse, error) {
+func (us *UserServiceImpl) SignUp(userDto dto.AuthRequest) (*dto.TokenResponse, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(userDto.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -44,7 +52,7 @@ func (us *UserService) SignUp(userDto dto.AuthRequest) (*dto.TokenResponse, erro
 	return us.generateTokens(user.ID)
 }
 
-func (us *UserService) SignIn(userDto dto.AuthRequest) (*dto.TokenResponse, error) {
+func (us *UserServiceImpl) SignIn(userDto dto.AuthRequest) (*dto.TokenResponse, error) {
 	user, err := us.repo.GetUserByEmail(userDto.Email)
 	if err != nil {
 		return nil, err
@@ -58,7 +66,7 @@ func (us *UserService) SignIn(userDto dto.AuthRequest) (*dto.TokenResponse, erro
 	return us.generateTokens(user.ID)
 }
 
-func (us *UserService) RefreshRequest(tokenDto dto.RefreshRequest) (*dto.TokenResponse, error) {
+func (us *UserServiceImpl) RefreshRequest(tokenDto dto.RefreshRequest) (*dto.TokenResponse, error) {
 	id, err := authenticateToken(tokenDto.RefreshToken, constants.RefreshToken)
 
 	if err != nil {
@@ -72,15 +80,15 @@ func (us *UserService) RefreshRequest(tokenDto dto.RefreshRequest) (*dto.TokenRe
 	return us.generateTokens(id)
 }
 
-func (us *UserService) GetUser(id uint) (*models.User, error) {
+func (us *UserServiceImpl) GetUser(id uint) (*models.User, error) {
 	return us.repo.GetUser(id)
 }
 
-func (us *UserService) GetUserByEmail(email string) (*models.User, error) {
+func (us *UserServiceImpl) GetUserByEmail(email string) (*models.User, error) {
 	return us.repo.GetUserByEmail(email)
 }
 
-func (us *UserService) generateTokens(id uint) (*dto.TokenResponse, error) {
+func (us *UserServiceImpl) generateTokens(id uint) (*dto.TokenResponse, error) {
 	accessToken, err := generateJWT(id, constants.AccessToken)
 	if err != nil {
 		return nil, err
@@ -90,12 +98,12 @@ func (us *UserService) generateTokens(id uint) (*dto.TokenResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = us.redis.Set(ctx, "accessToken:"+strconv.FormatUint(uint64(id), 10), accessToken, time.Hour*24)
+	err = us.cache.Set(ctx, "accessToken:"+strconv.FormatUint(uint64(id), 10), accessToken, time.Hour*24)
 	if err != nil {
 		return nil, err
 	}
 
-	err = us.redis.Set(ctx, "refreshToken:"+strconv.FormatUint(uint64(id), 10), refreshToken, time.Hour*24)
+	err = us.cache.Set(ctx, "refreshToken:"+strconv.FormatUint(uint64(id), 10), refreshToken, time.Hour*24)
 	if err != nil {
 		return nil, err
 	}
