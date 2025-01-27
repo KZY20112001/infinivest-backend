@@ -72,5 +72,4 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"user": user})
-
 }

@@ -24,7 +24,7 @@ func NewPostgresProfileRepo(db *gorm.DB) *PostgresProfileRepo {
 
 func (ptr *PostgresProfileRepo) CreateProfile(profile *models.Profile) error {
 	if profile == nil {
-		return errors.New("profile cannot be nil")
+		return constants.ErrNil
 	}
 	if err := ptr.db.Create(&profile).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {

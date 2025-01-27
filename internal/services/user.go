@@ -51,13 +51,13 @@ func (us *UserServiceImpl) SignUp(userDto dto.AuthRequest) (*dto.TokenResponse, 
 func (us *UserServiceImpl) SignIn(userDto dto.AuthRequest) (*dto.TokenResponse, error) {
 	user, err := us.repo.GetUserByEmail(userDto.Email)
 	if err != nil {
-		return nil, err
+		return nil, constants.ErrInvalidCredentials
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(userDto.Password))
 
 	if err != nil {
-		return nil, constants.ErrNotFound
+		return nil, constants.ErrInvalidCredentials
 	}
 	return us.generateTokens(user.ID)
 }

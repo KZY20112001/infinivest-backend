@@ -27,7 +27,7 @@ func NewPostgresUserRepo(db *gorm.DB) *PostgresUserRepo {
 
 func (ptr *PostgresUserRepo) SignUp(user *models.User) error {
 	if user == nil {
-		return errors.New("user cannot be nil")
+		return constants.ErrNil
 	}
 
 	if err := ptr.db.Create(&user).Error; err != nil {

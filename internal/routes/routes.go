@@ -10,8 +10,8 @@ import (
 func RegisterRoutes(userHandler *handlers.UserHandler, profileHandler *handlers.ProfileHandler) *gin.Engine {
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{" http://localhost:3000"},
-		AllowMethods:     []string{"GET", "POST", "DELETE", "PUT", "PATCH"},
+		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
 		AllowHeaders:     []string{"Origin"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,

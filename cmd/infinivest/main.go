@@ -10,6 +10,7 @@ import (
 
 	"github.com/KZY20112001/infinivest-backend/internal/db"
 	"github.com/KZY20112001/infinivest-backend/internal/handlers"
+	"github.com/KZY20112001/infinivest-backend/internal/models"
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 	"github.com/KZY20112001/infinivest-backend/internal/routes"
 	"github.com/KZY20112001/infinivest-backend/internal/services"
@@ -32,6 +33,7 @@ func init() {
 	if err != nil {
 		log.Fatalf("error in connecting to database: %v", err.Error())
 	}
+	postgresDB.AutoMigrate(&models.User{}, &models.Profile{})
 
 	// redisClient, err = db.ConnectToRedis()
 	// if err != nil {
