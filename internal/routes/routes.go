@@ -1,11 +1,22 @@
 package routes
 
 import (
+	"github.com/gin-contrib/cors"
+
 	"github.com/KZY20112001/infinivest-backend/internal/handlers"
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterRoutes(r *gin.Engine, userHandler handlers.UserHandler, profileHandler handlers.ProfileHandler) {
+func RegisterRoutes(userHandler *handlers.UserHandler, profileHandler *handlers.ProfileHandler) *gin.Engine {
+	r := gin.Default()
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{" http://localhost:3000"},
+		AllowMethods:     []string{"GET", "POST", "DELETE", "PUT", "PATCH"},
+		AllowHeaders:     []string{"Origin"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
 	RegisterUserRoutes(r, userHandler)
 	RegisterProfileRoutes(r, profileHandler)
+	return r
 }

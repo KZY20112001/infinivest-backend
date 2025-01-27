@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterProfileRoutes(r *gin.Engine, h handlers.ProfileHandler) {
+func RegisterProfileRoutes(r *gin.Engine, h *handlers.ProfileHandler) {
 	profileGroup := r.Group("/profile")
 	profileGroup.Use(middlewares.AuthMiddleware())
 	{

@@ -8,22 +8,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type ProfileHandler interface {
-	CreateProfile(c *gin.Context)
-	UpdateProfile(c *gin.Context)
-	GetProfile(c *gin.Context)
-	// GetCurrentuser(c *gin.Context)
-}
-
-type ProfileHandlerImpl struct {
+type ProfileHandler struct {
 	profileService services.ProfileService
 }
 
-func NewProfileHandlerImpl(ps services.ProfileService) *ProfileHandlerImpl {
-	return &ProfileHandlerImpl{profileService: ps}
+func NewProfileHandler(ps services.ProfileService) *ProfileHandler {
+	return &ProfileHandler{profileService: ps}
 }
 
-func (h *ProfileHandlerImpl) CreateProfile(c *gin.Context) {
+func (h *ProfileHandler) CreateProfile(c *gin.Context) {
 	var dto dto.ProfileRequest
 	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -37,7 +30,7 @@ func (h *ProfileHandlerImpl) CreateProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully created the profile"})
 }
 
-func (h *ProfileHandlerImpl) UpdateProfile(c *gin.Context) {
+func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 	var dto dto.ProfileRequest
 	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -51,7 +44,7 @@ func (h *ProfileHandlerImpl) UpdateProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully updated the profile"})
 }
 
-func (h *ProfileHandlerImpl) GetProfile(c *gin.Context) {
+func (h *ProfileHandler) GetProfile(c *gin.Context) {
 	userID := c.GetUint("id")
 	profile, err := h.profileService.GetProfile(userID)
 	if err != nil {

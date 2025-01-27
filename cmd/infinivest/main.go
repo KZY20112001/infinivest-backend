@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -15,7 +14,6 @@ import (
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 	"github.com/KZY20112001/infinivest-backend/internal/routes"
 	"github.com/KZY20112001/infinivest-backend/internal/services"
-	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -41,45 +39,46 @@ func init() {
 }
 
 func main() {
-	r := gin.Default()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	redisCache := repositories.NewRedisCache(redisClient)
+	//redisCache := repositories.NewRedisCache(redisClient)
 	postgresUserRepo := repositories.NewPostgresUserRepo(postgresDB)
 	postgresProfileRepo := repositories.NewPostgresProfileRepo(postgresDB)
 
-	userService := services.NewUserServiceImpl(postgresUserRepo, redisCache)
+	userService := services.NewUserServiceImpl(postgresUserRepo)
 	profileService := services.NewProfileServiceImpl(postgresProfileRepo, userService)
 
-	userHandler := handlers.NewUserHandlerImpl(userService)
-	profileHandler := handlers.NewProfileHandlerImpl(profileService)
+	userHandler := handlers.NewUserHandler(userService)
+	profileHandler := handlers.NewProfileHandler(profileService)
 
-	routes.RegisterRoutes(r, userHandler, profileHandler)
+	r := routes.RegisterRoutes(userHandler, profileHandler)
 
-	server := &http.Server{
-		Addr:    ":" + os.Getenv("PORT"),
+	srv := &http.Server{
+		Addr:    ":8080",
 		Handler: r,
 	}
+
+	// Initializing the server in a goroutine so that
+	// it won't block the graceful shutdown handling below
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server failed: %s\n", err)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
 		}
 	}()
 
-	// Wait for interrupt signal to gracefully shutdown the server with
-	// a timeout of 5 seconds.
-	quit := make(chan os.Signal, 1)
-	// kill (no param) default send syscall.SIGTERM
-	// kill -2 is syscall.SIGINT
-	// kill -9 is syscall.SIGKILL but can't be catch, so don't need add it
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	log.Println("Shutting down server...")
+	// Listen for the interrupt signal.
+	<-ctx.Done()
+
+	// Restore default behavior on the interrupt signal and notify user of shutdown.
+	stop()
+	log.Println("shutting down gracefully, press Ctrl+C again to force")
 
 	// The context is used to inform the server it has 5 seconds to finish
 	// the request it is currently handling
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatal("Server forced to shutdown: ", err)
 	}
 

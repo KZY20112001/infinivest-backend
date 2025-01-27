@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"errors"
 	"os"
 	"strconv"
@@ -25,15 +24,12 @@ type UserService interface {
 }
 
 type UserServiceImpl struct {
-	repo  repositories.UserRepo
-	cache repositories.Cache
+	repo repositories.UserRepo
 }
 
-var ctx = context.Background()
-
-func NewUserServiceImpl(ur repositories.UserRepo, cache repositories.Cache) *UserServiceImpl {
+func NewUserServiceImpl(ur repositories.UserRepo) *UserServiceImpl {
 	return &UserServiceImpl{
-		repo: ur, cache: cache,
+		repo: ur,
 	}
 }
 
@@ -95,15 +91,6 @@ func (us *UserServiceImpl) generateTokens(id uint) (*dto.TokenResponse, error) {
 	}
 
 	refreshToken, err := generateJWT(id, constants.RefreshToken)
-	if err != nil {
-		return nil, err
-	}
-	err = us.cache.Set(ctx, "accessToken:"+strconv.FormatUint(uint64(id), 10), accessToken, time.Hour*24)
-	if err != nil {
-		return nil, err
-	}
-
-	err = us.cache.Set(ctx, "refreshToken:"+strconv.FormatUint(uint64(id), 10), refreshToken, time.Hour*24)
 	if err != nil {
 		return nil, err
 	}

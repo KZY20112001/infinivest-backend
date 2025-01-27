@@ -27,10 +27,12 @@ func (ps *ProfileServiceImpl) CreateProfile(userID uint, profileDto dto.ProfileR
 		return err
 	}
 	profile := models.Profile{
-		UserID:    userID,
-		User:      *user,
-		FirstName: profileDto.FirstName,
-		LastName:  profileDto.LastName,
+		UserID:     userID,
+		User:       *user,
+		FirstName:  profileDto.FirstName,
+		LastName:   profileDto.LastName,
+		Email:      profileDto.Email,
+		ProfileUrl: profileDto.ProfileUrl,
 	}
 	return ps.repo.CreateProfile(&profile)
 }
@@ -42,6 +44,8 @@ func (ps *ProfileServiceImpl) UpdateProfile(userID uint, profileDto dto.ProfileR
 	}
 	profile.FirstName = profileDto.FirstName
 	profile.LastName = profileDto.LastName
+	profile.Email = profileDto.Email
+	profile.ProfileUrl = profileDto.ProfileUrl
 	return ps.repo.UpdateProfile(profile)
 }
 
