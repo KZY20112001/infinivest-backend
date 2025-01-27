@@ -8,41 +8,42 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/KZY20112001/infinivest-backend/internal/app"
 	"github.com/KZY20112001/infinivest-backend/internal/db"
 	"github.com/KZY20112001/infinivest-backend/internal/handlers"
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 	"github.com/KZY20112001/infinivest-backend/internal/routes"
 	"github.com/KZY20112001/infinivest-backend/internal/services"
-	"github.com/redis/go-redis/v9"
+	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
 
 var (
-	postgresDB  *gorm.DB
-	redisClient *redis.Client
+	postgresDB *gorm.DB
+	// redisClient *redis.Client
 )
 
 func init() {
-	app.LoadEnv()
+	err := godotenv.Load(".env.local")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
 
-	var err error
 	postgresDB, err = db.ConnectToPostgres()
 	if err != nil {
 		log.Fatalf("error in connecting to database: %v", err.Error())
 	}
 
-	redisClient, err = db.ConnectToRedis()
-	if err != nil {
-		log.Fatalf("error in connecting to redis: %v", err.Error())
-	}
+	// redisClient, err = db.ConnectToRedis()
+	// if err != nil {
+	// 	log.Fatalf("error in connecting to redis: %v", err.Error())
+	// }
 }
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	//redisCache := repositories.NewRedisCache(redisClient)
+	// redisCache := repositories.NewRedisCache(redisClient)
 	postgresUserRepo := repositories.NewPostgresUserRepo(postgresDB)
 	postgresProfileRepo := repositories.NewPostgresProfileRepo(postgresDB)
 
