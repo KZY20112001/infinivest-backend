@@ -14,6 +14,8 @@ import (
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 	"github.com/KZY20112001/infinivest-backend/internal/routes"
 	"github.com/KZY20112001/infinivest-backend/internal/services"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
@@ -37,25 +39,48 @@ func init() {
 
 	// redisClient, err = db.ConnectToRedis()
 	// if err != nil {
-	// 	log.Fatalf("error in connecting to redis: %v", err.Error())
+	// 	log.Fatalf("error in connecting to redis: %w", err.Error())
 	// }
+}
+
+func initUserService(db *gorm.DB) services.UserService {
+	repo := repositories.NewPostgresUserRepo(db)
+	return services.NewUserServiceImpl(repo)
+}
+
+func initProfileService(db *gorm.DB, userService services.UserService) services.ProfileService {
+	repo := repositories.NewPostgresProfileRepo(db)
+	return services.NewProfileServiceImpl(repo, userService)
+}
+
+func initS3Service(client *s3.PresignClient) services.S3Service {
+	repo := repositories.NewS3RepositoryImpl(client)
+	return services.NewS3ServiceImpl(repo)
+}
+
+func initHandlers(db *gorm.DB, s3Client *s3.PresignClient) (*handlers.UserHandler, *handlers.ProfileHandler, *handlers.S3Handler) {
+	s3Service := initS3Service(s3Client)
+	userService := initUserService(db)
+	profileService := initProfileService(db, userService)
+
+	return handlers.NewUserHandler(userService),
+		handlers.NewProfileHandler(profileService),
+		handlers.NewS3Handler(s3Service)
 }
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// redisCache := repositories.NewRedisCache(redisClient)
-	postgresUserRepo := repositories.NewPostgresUserRepo(postgresDB)
-	postgresProfileRepo := repositories.NewPostgresProfileRepo(postgresDB)
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-southeast-1"))
+	if err != nil {
+		log.Fatalf("unable to load SDK config, %v", err)
+	}
+	s3Client := s3.NewFromConfig(cfg)
+	presignClient := s3.NewPresignClient(s3Client)
+	userHandler, profileHandler, s3Handler := initHandlers(postgresDB, presignClient)
 
-	userService := services.NewUserServiceImpl(postgresUserRepo)
-	profileService := services.NewProfileServiceImpl(postgresProfileRepo, userService)
-
-	userHandler := handlers.NewUserHandler(userService)
-	profileHandler := handlers.NewProfileHandler(profileService)
-
-	r := routes.RegisterRoutes(userHandler, profileHandler)
+	r := routes.RegisterRoutes(userHandler, profileHandler, s3Handler)
 
 	srv := &http.Server{
 		Addr:    ":8080",

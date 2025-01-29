@@ -10,4 +10,5 @@ type Profile struct {
 	LastName   string
 	Address    string
 	ProfileUrl string
+	ProfileID  string
 }

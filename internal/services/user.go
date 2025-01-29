@@ -117,7 +117,7 @@ func generateJWT(id uint, tokenType constants.TokenType) (string, error) {
 		"exp":  t,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(os.Getenv("TOKEN_SECRET")))
+	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 }
 
 func authenticateToken(tokenString string, expectedType constants.TokenType) (uint, error) {
@@ -125,7 +125,7 @@ func authenticateToken(tokenString string, expectedType constants.TokenType) (ui
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
 		}
-		return []byte(os.Getenv("TOKEN_SECRET")), nil
+		return []byte(os.Getenv("JWT_SECRET")), nil
 	})
 
 	if err != nil {

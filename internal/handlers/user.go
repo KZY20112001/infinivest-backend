@@ -71,5 +71,5 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 		HandleError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"user": user})
+	c.JSON(http.StatusOK, gin.H{"user": user})
 }
