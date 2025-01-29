@@ -8,6 +8,6 @@ type Profile struct {
 	User       User
 	FirstName  string
 	LastName   string
-	Email      string
+	Address    string
 	ProfileUrl string
 }

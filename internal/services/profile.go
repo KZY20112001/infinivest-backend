@@ -31,7 +31,7 @@ func (ps *ProfileServiceImpl) CreateProfile(userID uint, profileDto dto.ProfileR
 		User:       *user,
 		FirstName:  profileDto.FirstName,
 		LastName:   profileDto.LastName,
-		Email:      profileDto.Email,
+		Address:    profileDto.Address,
 		ProfileUrl: profileDto.ProfileUrl,
 	}
 	return ps.repo.CreateProfile(&profile)
@@ -44,7 +44,7 @@ func (ps *ProfileServiceImpl) UpdateProfile(userID uint, profileDto dto.ProfileR
 	}
 	profile.FirstName = profileDto.FirstName
 	profile.LastName = profileDto.LastName
-	profile.Email = profileDto.Email
+	profile.Address = profileDto.Address
 	profile.ProfileUrl = profileDto.ProfileUrl
 	return ps.repo.UpdateProfile(profile)
 }
