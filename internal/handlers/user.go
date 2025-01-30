@@ -3,19 +3,27 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/KZY20112001/infinivest-backend/internal/app"
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
+	"github.com/KZY20112001/infinivest-backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
-func SignUp(c *gin.Context) {
+type UserHandler struct {
+	userService services.UserService
+}
+
+func NewUserHandler(us services.UserService) *UserHandler {
+	return &UserHandler{userService: us}
+}
+
+func (h *UserHandler) SignUp(c *gin.Context) {
 	var dto dto.AuthRequest
 	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	tokens, err := app.UserService.SignUp(dto)
+	tokens, err := h.userService.SignUp(dto)
 	if err != nil {
 		HandleError(c, err)
 		return
@@ -25,14 +33,14 @@ func SignUp(c *gin.Context) {
 
 }
 
-func SignIn(c *gin.Context) {
+func (h *UserHandler) SignIn(c *gin.Context) {
 	var dto dto.AuthRequest
 	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	tokens, err := app.UserService.SignIn(dto)
+	tokens, err := h.userService.SignIn(dto)
 	if err != nil {
 		HandleError(c, err)
 		return
@@ -41,13 +49,13 @@ func SignIn(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"tokens": tokens})
 }
 
-func RefreshToken(c *gin.Context) {
+func (h *UserHandler) RefreshToken(c *gin.Context) {
 	var dto dto.RefreshRequest
 	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	tokens, err := app.UserService.RefreshRequest(dto)
+	tokens, err := h.userService.RefreshRequest(dto)
 	if err != nil {
 		HandleError(c, err)
 		return
@@ -56,13 +64,12 @@ func RefreshToken(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"tokens": tokens})
 }
 
-func GetUser(c *gin.Context) {
-	email := c.Param("email")
-	user, err := app.UserService.GetUser(email)
+func (h *UserHandler) GetCurrentUser(c *gin.Context) {
+	id := c.GetUint("id")
+	user, err := h.userService.GetUser(id)
 	if err != nil {
 		HandleError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"user": user})
-
+	c.JSON(http.StatusOK, gin.H{"user": user})
 }

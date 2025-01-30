@@ -1,34 +1,39 @@
 package services
 
 import (
-	"context"
 	"errors"
 	"os"
+	"strconv"
 	"time"
 
-	"github.com/KZY20112001/infinivest-backend/internal/cache"
+	"github.com/KZY20112001/infinivest-backend/internal/constants"
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
-	"github.com/KZY20112001/infinivest-backend/internal/global"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 	"github.com/golang-jwt/jwt"
 	"golang.org/x/crypto/bcrypt"
 )
 
-type UserService struct {
-	repo  repositories.UserRepo
-	redis *cache.RedisCache
+type UserService interface {
+	SignUp(userDto dto.AuthRequest) (*dto.TokenResponse, error)
+	SignIn(userDto dto.AuthRequest) (*dto.TokenResponse, error)
+	RefreshRequest(tokenDto dto.RefreshRequest) (*dto.TokenResponse, error)
+	GetUser(id uint) (*models.User, error)
+	GetUserByEmail(email string) (*models.User, error)
+	generateTokens(id uint) (*dto.TokenResponse, error)
 }
 
-var ctx = context.Background()
+type UserServiceImpl struct {
+	repo repositories.UserRepo
+}
 
-func NewUserService(ur repositories.UserRepo, client *cache.RedisCache) *UserService {
-	return &UserService{
-		repo: ur, redis: client,
+func NewUserServiceImpl(ur repositories.UserRepo) *UserServiceImpl {
+	return &UserServiceImpl{
+		repo: ur,
 	}
 }
 
-func (us *UserService) SignUp(userDto dto.AuthRequest) (*dto.TokenResponse, error) {
+func (us *UserServiceImpl) SignUp(userDto dto.AuthRequest) (*dto.TokenResponse, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(userDto.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -40,57 +45,52 @@ func (us *UserService) SignUp(userDto dto.AuthRequest) (*dto.TokenResponse, erro
 	if err := us.repo.SignUp(&user); err != nil {
 		return nil, err
 	}
-	return us.generateTokens(user.Email)
+	return us.generateTokens(user.ID)
 }
 
-func (us *UserService) SignIn(userDto dto.AuthRequest) (*dto.TokenResponse, error) {
-	user, err := us.repo.GetUser(userDto.Email)
+func (us *UserServiceImpl) SignIn(userDto dto.AuthRequest) (*dto.TokenResponse, error) {
+	user, err := us.repo.GetUserByEmail(userDto.Email)
 	if err != nil {
-		return nil, err
+		return nil, constants.ErrInvalidCredentials
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(userDto.Password))
 
 	if err != nil {
-		return nil, global.ErrNotFound
+		return nil, constants.ErrInvalidCredentials
 	}
-	return us.generateTokens(user.Email)
+	return us.generateTokens(user.ID)
 }
 
-func (us *UserService) RefreshRequest(tokenDto dto.RefreshRequest) (*dto.TokenResponse, error) {
-	email, err := authenticateToken(tokenDto.RefreshToken, global.RefreshToken)
+func (us *UserServiceImpl) RefreshRequest(tokenDto dto.RefreshRequest) (*dto.TokenResponse, error) {
+	id, err := authenticateToken(tokenDto.RefreshToken, constants.RefreshToken)
+
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = us.GetUser(email)
+	_, err = us.GetUser(id)
 	if err != nil {
 		return nil, err
 	}
-	return us.generateTokens(email)
+	return us.generateTokens(id)
 }
 
-func (us *UserService) GetUser(email string) (*models.User, error) {
-	return us.repo.GetUser(email)
+func (us *UserServiceImpl) GetUser(id uint) (*models.User, error) {
+	return us.repo.GetUser(id)
 }
 
-func (us *UserService) generateTokens(email string) (*dto.TokenResponse, error) {
+func (us *UserServiceImpl) GetUserByEmail(email string) (*models.User, error) {
+	return us.repo.GetUserByEmail(email)
+}
 
-	accessToken, err := generateJWT(email, global.AccessToken)
+func (us *UserServiceImpl) generateTokens(id uint) (*dto.TokenResponse, error) {
+	accessToken, err := generateJWT(id, constants.AccessToken)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := generateJWT(email, global.RefreshToken)
-	if err != nil {
-		return nil, err
-	}
-	err = us.redis.Set(ctx, "accessToken:"+email, accessToken, time.Hour*24)
-	if err != nil {
-		return nil, err
-	}
-
-	err = us.redis.Set(ctx, "refreshToken:"+email, refreshToken, time.Hour*24)
+	refreshToken, err := generateJWT(id, constants.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -101,56 +101,60 @@ func (us *UserService) generateTokens(email string) (*dto.TokenResponse, error) 
 	}, nil
 }
 
-func generateJWT(email string, tokenType global.TokenType) (string, error) {
+func generateJWT(id uint, tokenType constants.TokenType) (string, error) {
 	var t int64 = 0
 	switch tokenType {
-	case global.AccessToken:
+	case constants.AccessToken:
 		t = time.Now().Add(2 * time.Hour).Unix()
-	case global.RefreshToken:
+	case constants.RefreshToken:
 		t = time.Now().Add(8 * time.Hour).Unix()
 	default:
 		t = 0
 	}
 	claims := jwt.MapClaims{
-		"email": email,
-		"type":  tokenType,
-		"exp":   t,
+		"id":   strconv.FormatUint(uint64(id), 10),
+		"type": tokenType,
+		"exp":  t,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(os.Getenv("TOKEN_SECRET")))
+	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 }
 
-func authenticateToken(tokenString string, expectedType global.TokenType) (string, error) {
-
+func authenticateToken(tokenString string, expectedType constants.TokenType) (uint, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
 		}
-		return []byte(os.Getenv("TOKEN_SECRET")), nil
+		return []byte(os.Getenv("JWT_SECRET")), nil
 	})
 
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		if claims["type"] != string(expectedType) {
-			return "", errors.New("invalid token type")
+			return 0, errors.New("invalid token type")
 		}
 
 		if exp, ok := claims["exp"].(float64); ok {
 			if time.Unix(int64(exp), 0).Before(time.Now()) {
-				return "", errors.New("token has expired")
+				return 0, errors.New("token has expired")
 			}
 		} else {
-			return "", errors.New("invalid expiration time")
+			return 0, errors.New("invalid expiration time")
 		}
 
-		if email, ok := claims["email"].(string); ok {
-			return email, nil
+		if idStr, ok := claims["id"].(string); ok {
+			if id, err := strconv.ParseUint(idStr, 10, 64); err == nil {
+				return uint(id), nil
+			} else {
+
+				return 0, err
+			}
 		}
-		return "", errors.New("email claim is missing")
+		return 0, errors.New("ID claim is missing")
 	}
 
-	return "", errors.New("invalid token")
+	return 0, errors.New("invalid token")
 }
