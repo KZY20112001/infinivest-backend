@@ -23,17 +23,17 @@ type UserService interface {
 	generateTokens(id uint) (*dto.TokenResponse, error)
 }
 
-type UserServiceImpl struct {
+type userServiceImpl struct {
 	repo repositories.UserRepo
 }
 
-func NewUserServiceImpl(ur repositories.UserRepo) *UserServiceImpl {
-	return &UserServiceImpl{
+func NewUserServiceImpl(ur repositories.UserRepo) *userServiceImpl {
+	return &userServiceImpl{
 		repo: ur,
 	}
 }
 
-func (us *UserServiceImpl) SignUp(userDto dto.AuthRequest) (*dto.TokenResponse, error) {
+func (us *userServiceImpl) SignUp(userDto dto.AuthRequest) (*dto.TokenResponse, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(userDto.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (us *UserServiceImpl) SignUp(userDto dto.AuthRequest) (*dto.TokenResponse, 
 	return us.generateTokens(user.ID)
 }
 
-func (us *UserServiceImpl) SignIn(userDto dto.AuthRequest) (*dto.TokenResponse, error) {
+func (us *userServiceImpl) SignIn(userDto dto.AuthRequest) (*dto.TokenResponse, error) {
 	user, err := us.repo.GetUserByEmail(userDto.Email)
 	if err != nil {
 		return nil, constants.ErrInvalidCredentials
@@ -62,7 +62,7 @@ func (us *UserServiceImpl) SignIn(userDto dto.AuthRequest) (*dto.TokenResponse, 
 	return us.generateTokens(user.ID)
 }
 
-func (us *UserServiceImpl) RefreshRequest(tokenDto dto.RefreshRequest) (*dto.TokenResponse, error) {
+func (us *userServiceImpl) RefreshRequest(tokenDto dto.RefreshRequest) (*dto.TokenResponse, error) {
 	id, err := authenticateToken(tokenDto.RefreshToken, constants.RefreshToken)
 
 	if err != nil {
@@ -76,15 +76,15 @@ func (us *UserServiceImpl) RefreshRequest(tokenDto dto.RefreshRequest) (*dto.Tok
 	return us.generateTokens(id)
 }
 
-func (us *UserServiceImpl) GetUser(id uint) (*models.User, error) {
+func (us *userServiceImpl) GetUser(id uint) (*models.User, error) {
 	return us.repo.GetUser(id)
 }
 
-func (us *UserServiceImpl) GetUserByEmail(email string) (*models.User, error) {
+func (us *userServiceImpl) GetUserByEmail(email string) (*models.User, error) {
 	return us.repo.GetUserByEmail(email)
 }
 
-func (us *UserServiceImpl) generateTokens(id uint) (*dto.TokenResponse, error) {
+func (us *userServiceImpl) generateTokens(id uint) (*dto.TokenResponse, error) {
 	accessToken, err := generateJWT(id, constants.AccessToken)
 	if err != nil {
 		return nil, err

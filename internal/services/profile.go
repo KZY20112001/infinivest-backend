@@ -12,16 +12,16 @@ type ProfileService interface {
 	GetProfile(userID uint) (*models.Profile, error)
 }
 
-type ProfileServiceImpl struct {
+type profileServiceImpl struct {
 	repo        repositories.ProfileRepo
 	userService UserService
 }
 
-func NewProfileServiceImpl(pr repositories.ProfileRepo, us UserService) *ProfileServiceImpl {
-	return &ProfileServiceImpl{repo: pr, userService: us}
+func NewProfileServiceImpl(pr repositories.ProfileRepo, us UserService) *profileServiceImpl {
+	return &profileServiceImpl{repo: pr, userService: us}
 }
 
-func (ps *ProfileServiceImpl) CreateProfile(userID uint, profileDto dto.ProfileRequest) error {
+func (ps *profileServiceImpl) CreateProfile(userID uint, profileDto dto.ProfileRequest) error {
 	user, err := ps.userService.GetUser(userID)
 	if err != nil {
 		return err
@@ -38,7 +38,7 @@ func (ps *ProfileServiceImpl) CreateProfile(userID uint, profileDto dto.ProfileR
 	return ps.repo.CreateProfile(&profile)
 }
 
-func (ps *ProfileServiceImpl) UpdateProfile(userID uint, profileDto dto.ProfileRequest) error {
+func (ps *profileServiceImpl) UpdateProfile(userID uint, profileDto dto.ProfileRequest) error {
 	profile, err := ps.repo.GetProfile(userID)
 	if err != nil {
 		return err
@@ -51,6 +51,6 @@ func (ps *ProfileServiceImpl) UpdateProfile(userID uint, profileDto dto.ProfileR
 	return ps.repo.UpdateProfile(profile)
 }
 
-func (ps *ProfileServiceImpl) GetProfile(userID uint) (*models.Profile, error) {
+func (ps *profileServiceImpl) GetProfile(userID uint) (*models.Profile, error) {
 	return ps.repo.GetProfile(userID)
 }

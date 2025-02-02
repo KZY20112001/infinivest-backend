@@ -14,15 +14,15 @@ type ProfileRepo interface {
 	GetProfile(userID uint) (*models.Profile, error)
 }
 
-type PostgresProfileRepo struct {
+type postgresProfileRepo struct {
 	db *gorm.DB
 }
 
-func NewPostgresProfileRepo(db *gorm.DB) *PostgresProfileRepo {
-	return &PostgresProfileRepo{db: db}
+func NewPostgresProfileRepo(db *gorm.DB) *postgresProfileRepo {
+	return &postgresProfileRepo{db: db}
 }
 
-func (ptr *PostgresProfileRepo) CreateProfile(profile *models.Profile) error {
+func (ptr *postgresProfileRepo) CreateProfile(profile *models.Profile) error {
 	if profile == nil {
 		return constants.ErrNil
 	}
@@ -35,14 +35,14 @@ func (ptr *PostgresProfileRepo) CreateProfile(profile *models.Profile) error {
 	return nil
 }
 
-func (ptr *PostgresProfileRepo) UpdateProfile(updatedProfile *models.Profile) error {
+func (ptr *postgresProfileRepo) UpdateProfile(updatedProfile *models.Profile) error {
 	if err := ptr.db.Save(&updatedProfile).Error; err != nil {
 		return err
 	}
 	return nil
 }
 
-func (ptr *PostgresProfileRepo) GetProfile(userID uint) (*models.Profile, error) {
+func (ptr *postgresProfileRepo) GetProfile(userID uint) (*models.Profile, error) {
 	var profile models.Profile
 	if err := ptr.db.Preload("User").Where("user_id = ?", userID).First(&profile).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os/signal"
@@ -58,13 +59,20 @@ func initS3Service(client *s3.PresignClient) services.S3Service {
 	return services.NewS3ServiceImpl(repo)
 }
 
-func initHandlers(db *gorm.DB, s3Client *s3.PresignClient) (*handlers.UserHandler, *handlers.ProfileHandler, *handlers.S3Handler) {
+func initPortfolioService() services.PortfolioService {
+	baseUrl := "http://localhost:5000"
+	repo := repositories.NewFlaskMicroservice(baseUrl)
+	return services.NewPortfolioServiceImpl(repo)
+}
+
+func initHandlers(db *gorm.DB, s3Client *s3.PresignClient) (*handlers.UserHandler, *handlers.ProfileHandler, *handlers.PortfolioHandler, *handlers.S3Handler) {
 	s3Service := initS3Service(s3Client)
 	userService := initUserService(db)
 	profileService := initProfileService(db, userService)
-
+	portfolioService := initPortfolioService()
 	return handlers.NewUserHandler(userService),
 		handlers.NewProfileHandler(profileService),
+		handlers.NewPortfolioHandler(portfolioService),
 		handlers.NewS3Handler(s3Service)
 }
 
@@ -78,21 +86,20 @@ func main() {
 	}
 	s3Client := s3.NewFromConfig(cfg)
 	presignClient := s3.NewPresignClient(s3Client)
-	userHandler, profileHandler, s3Handler := initHandlers(postgresDB, presignClient)
+	userHandler, profileHandler, portfolioHandler, s3Handler := initHandlers(postgresDB, presignClient)
 
-	r := routes.RegisterRoutes(userHandler, profileHandler, s3Handler)
-
+	r := routes.RegisterRoutes(userHandler, profileHandler, portfolioHandler, s3Handler)
 	srv := &http.Server{
 		Addr:    ":8080",
 		Handler: r,
 	}
-
 	// Initializing the server in a goroutine so that
 	// it won't block the graceful shutdown handling below
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil {
 			log.Fatalf("listen: %s\n", err)
 		}
+		fmt.Println("Server started")
 	}()
 
 	// Listen for the interrupt signal.

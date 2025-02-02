@@ -13,15 +13,15 @@ type S3Repository interface {
 	GeneratePresignedUploadURL(ctx context.Context, bucketName, objectKey string) (string, error)
 }
 
-type S3RepositoryImpl struct {
+type s3RepositoryImpl struct {
 	client *s3.PresignClient
 }
 
-func NewS3RepositoryImpl(client *s3.PresignClient) *S3RepositoryImpl {
-	return &S3RepositoryImpl{client: client}
+func NewS3RepositoryImpl(client *s3.PresignClient) *s3RepositoryImpl {
+	return &s3RepositoryImpl{client: client}
 }
 
-func (r *S3RepositoryImpl) GeneratePresignedUploadURL(ctx context.Context, bucketName, objectKey string) (string, error) {
+func (r *s3RepositoryImpl) GeneratePresignedUploadURL(ctx context.Context, bucketName, objectKey string) (string, error) {
 	req, err := r.client.PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucketName),
 		Key:    aws.String(objectKey),

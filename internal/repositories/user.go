@@ -15,17 +15,17 @@ type UserRepo interface {
 	GetUserByEmail(email string) (*models.User, error)
 }
 
-type PostgresUserRepo struct {
+type postgresUserRepo struct {
 	db *gorm.DB
 }
 
-func NewPostgresUserRepo(db *gorm.DB) *PostgresUserRepo {
-	return &PostgresUserRepo{
+func NewPostgresUserRepo(db *gorm.DB) *postgresUserRepo {
+	return &postgresUserRepo{
 		db: db,
 	}
 }
 
-func (ptr *PostgresUserRepo) SignUp(user *models.User) error {
+func (ptr *postgresUserRepo) SignUp(user *models.User) error {
 	if user == nil {
 		return constants.ErrNil
 	}
@@ -39,7 +39,7 @@ func (ptr *PostgresUserRepo) SignUp(user *models.User) error {
 	return nil
 }
 
-func (ptr *PostgresUserRepo) GetUser(id uint) (*models.User, error) {
+func (ptr *postgresUserRepo) GetUser(id uint) (*models.User, error) {
 	var user models.User
 	if err := ptr.db.Where("ID = ?", id).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -54,7 +54,7 @@ func (ptr *PostgresUserRepo) GetUser(id uint) (*models.User, error) {
 	return &user, nil
 }
 
-func (ptr *PostgresUserRepo) GetUserByEmail(email string) (*models.User, error) {
+func (ptr *postgresUserRepo) GetUserByEmail(email string) (*models.User, error) {
 	var user models.User
 	if err := ptr.db.Where("Email = ?", email).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
