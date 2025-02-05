@@ -97,7 +97,7 @@ func main() {
 	// it won't block the graceful shutdown handling below
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
-			log.Fatalf("listen: %s\n", err)
+			log.Printf("listen: %s\n", err)
 		}
 		fmt.Println("Server started")
 	}()

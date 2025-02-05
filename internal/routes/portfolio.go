@@ -11,8 +11,8 @@ func RegisterPortfolioRoutes(r *gin.Engine, h *handlers.PortfolioHandler) {
 	portfolioGroup.Use(middlewares.AuthMiddleware())
 	roboAdvisorGroup := portfolioGroup.Group("/robo-advisor")
 	{
-		roboAdvisorGroup.POST("/:bank_name/generate", h.GenerateRoboAdvisorPortfolio)
-		roboAdvisorGroup.PATCH("/")
+		roboAdvisorGroup.POST("/generate/categories", h.GenerateRoboAdvisorPortfolio)
+		roboAdvisorGroup.POST("/generate/assets", h.GenerateAssetAllocation)
 		roboAdvisorGroup.GET("/")
 	}
 

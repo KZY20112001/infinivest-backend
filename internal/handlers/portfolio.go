@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/KZY20112001/infinivest-backend/internal/dto"
 	"github.com/KZY20112001/infinivest-backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
@@ -17,7 +18,7 @@ func NewPortfolioHandler(ps services.PortfolioService) *PortfolioHandler {
 }
 
 func (h *PortfolioHandler) GenerateRoboAdvisorPortfolio(c *gin.Context) {
-	bankName := c.Param("bank_name")
+	bankName := c.PostForm("bank_name")
 	riskToleranceLevel := c.PostForm("risk_tolerance_level")
 	if riskToleranceLevel == "" {
 		HandleError(c, fmt.Errorf("risk tolerance level is required"))
@@ -29,7 +30,7 @@ func (h *PortfolioHandler) GenerateRoboAdvisorPortfolio(c *gin.Context) {
 		HandleError(c, err)
 		return
 	}
-	fmt.Println("name: ", bankStatement.Filename)
+
 	recommendation, err := h.portfolioService.GenerateRoboAdvisorPortfolio(bankStatement, bankName, riskToleranceLevel)
 	if err != nil {
 		HandleError(c, err)
@@ -37,4 +38,19 @@ func (h *PortfolioHandler) GenerateRoboAdvisorPortfolio(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, recommendation)
+}
+
+func (h *PortfolioHandler) GenerateAssetAllocation(c *gin.Context) {
+	var req dto.AssetAllocationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	assetAllocations, err := h.portfolioService.GenerateAssetAllocations(req)
+	if err != nil {
+		HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, assetAllocations)
 }
