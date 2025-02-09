@@ -17,29 +17,29 @@ func NewProfileHandler(ps services.ProfileService) *ProfileHandler {
 }
 
 func (h *ProfileHandler) CreateProfile(c *gin.Context) {
-	var dto dto.ProfileRequest
-	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
+	var req dto.ProfileRequest
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	userID := c.GetUint("id")
 
-	if err := h.profileService.CreateProfile(userID, dto); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := h.profileService.CreateProfile(userID, req); err != nil {
+		HandleError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully created the profile"})
 }
 
 func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
-	var dto dto.ProfileRequest
-	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
+	var req dto.ProfileRequest
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	userID := c.GetUint("id")
 
-	if err := h.profileService.UpdateProfile(userID, dto); err != nil {
+	if err := h.profileService.UpdateProfile(userID, req); err != nil {
 		HandleError(c, err)
 		return
 	}

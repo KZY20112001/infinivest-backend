@@ -17,13 +17,13 @@ func NewS3Handler(s3Service services.S3Service) *S3Handler {
 }
 
 func (h *S3Handler) GeneratePresignedUploadURL(c *gin.Context) {
-	var dto dto.PresignedUploadUrlRequest
-	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
+	var req dto.PresignedUploadUrlRequest
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	presignedUrl, err := h.s3Service.GeneratePresignedUploadURL(c, dto)
+	presignedUrl, err := h.s3Service.GeneratePresignedUploadURL(c, req)
 	if err != nil {
 		HandleError(c, err)
 		return

@@ -7,21 +7,21 @@ import (
 )
 
 type ProfileService interface {
-	CreateProfile(userID uint, profileDto dto.ProfileRequest) error
-	UpdateProfile(userID uint, profileDto dto.ProfileRequest) error
+	CreateProfile(userID uint, dto dto.ProfileRequest) error
+	UpdateProfile(userID uint, dto dto.ProfileRequest) error
 	GetProfile(userID uint) (*models.Profile, error)
 }
 
-type ProfileServiceImpl struct {
+type profileServiceImpl struct {
 	repo        repositories.ProfileRepo
 	userService UserService
 }
 
-func NewProfileServiceImpl(pr repositories.ProfileRepo, us UserService) *ProfileServiceImpl {
-	return &ProfileServiceImpl{repo: pr, userService: us}
+func NewProfileServiceImpl(pr repositories.ProfileRepo, us UserService) *profileServiceImpl {
+	return &profileServiceImpl{repo: pr, userService: us}
 }
 
-func (ps *ProfileServiceImpl) CreateProfile(userID uint, profileDto dto.ProfileRequest) error {
+func (ps *profileServiceImpl) CreateProfile(userID uint, dto dto.ProfileRequest) error {
 	user, err := ps.userService.GetUser(userID)
 	if err != nil {
 		return err
@@ -29,28 +29,28 @@ func (ps *ProfileServiceImpl) CreateProfile(userID uint, profileDto dto.ProfileR
 	profile := models.Profile{
 		UserID:     userID,
 		User:       *user,
-		FirstName:  profileDto.FirstName,
-		LastName:   profileDto.LastName,
-		Address:    profileDto.Address,
-		ProfileUrl: profileDto.ProfileUrl,
-		ProfileID:  profileDto.ProfileID,
+		FirstName:  dto.FirstName,
+		LastName:   dto.LastName,
+		Address:    dto.Address,
+		ProfileUrl: dto.ProfileUrl,
+		ProfileID:  dto.ProfileID,
 	}
 	return ps.repo.CreateProfile(&profile)
 }
 
-func (ps *ProfileServiceImpl) UpdateProfile(userID uint, profileDto dto.ProfileRequest) error {
+func (ps *profileServiceImpl) UpdateProfile(userID uint, dto dto.ProfileRequest) error {
 	profile, err := ps.repo.GetProfile(userID)
 	if err != nil {
 		return err
 	}
-	profile.FirstName = profileDto.FirstName
-	profile.LastName = profileDto.LastName
-	profile.Address = profileDto.Address
-	profile.ProfileUrl = profileDto.ProfileUrl
-	profile.ProfileID = profileDto.ProfileID
+	profile.FirstName = dto.FirstName
+	profile.LastName = dto.LastName
+	profile.Address = dto.Address
+	profile.ProfileUrl = dto.ProfileUrl
+	profile.ProfileID = dto.ProfileID
 	return ps.repo.UpdateProfile(profile)
 }
 
-func (ps *ProfileServiceImpl) GetProfile(userID uint) (*models.Profile, error) {
+func (ps *profileServiceImpl) GetProfile(userID uint) (*models.Profile, error) {
 	return ps.repo.GetProfile(userID)
 }

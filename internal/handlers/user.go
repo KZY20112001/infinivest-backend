@@ -17,13 +17,13 @@ func NewUserHandler(us services.UserService) *UserHandler {
 }
 
 func (h *UserHandler) SignUp(c *gin.Context) {
-	var dto dto.AuthRequest
-	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
+	var req dto.AuthRequest
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	tokens, err := h.userService.SignUp(dto)
+	tokens, err := h.userService.SignUp(req)
 	if err != nil {
 		HandleError(c, err)
 		return
@@ -34,13 +34,13 @@ func (h *UserHandler) SignUp(c *gin.Context) {
 }
 
 func (h *UserHandler) SignIn(c *gin.Context) {
-	var dto dto.AuthRequest
-	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
+	var req dto.AuthRequest
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	tokens, err := h.userService.SignIn(dto)
+	tokens, err := h.userService.SignIn(req)
 	if err != nil {
 		HandleError(c, err)
 		return
@@ -50,12 +50,12 @@ func (h *UserHandler) SignIn(c *gin.Context) {
 }
 
 func (h *UserHandler) RefreshToken(c *gin.Context) {
-	var dto dto.RefreshRequest
-	if err := c.ShouldBindBodyWithJSON(&dto); err != nil {
+	var req dto.RefreshRequest
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	tokens, err := h.userService.RefreshRequest(dto)
+	tokens, err := h.userService.RefreshRequest(req)
 	if err != nil {
 		HandleError(c, err)
 		return

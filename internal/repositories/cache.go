@@ -12,20 +12,20 @@ type Cache interface {
 	Get(ctx context.Context, key string) (string, error)
 }
 
-type RedisCache struct {
+type redisCache struct {
 	client *redis.Client
 }
 
-func NewRedisCache(client *redis.Client) *RedisCache {
-	return &RedisCache{
+func NewRedisCache(client *redis.Client) *redisCache {
+	return &redisCache{
 		client: client,
 	}
 }
 
-func (r *RedisCache) Set(ctx context.Context, key string, value string, expiration time.Duration) error {
+func (r *redisCache) Set(ctx context.Context, key string, value string, expiration time.Duration) error {
 	return r.client.Set(ctx, key, value, expiration).Err()
 }
 
-func (r *RedisCache) Get(ctx context.Context, key string) (string, error) {
+func (r *redisCache) Get(ctx context.Context, key string) (string, error) {
 	return r.client.Get(ctx, key).Result()
 }
