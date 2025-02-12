@@ -34,6 +34,8 @@ func (ps *profileServiceImpl) CreateProfile(userID uint, dto dto.ProfileRequest)
 		Address:    dto.Address,
 		ProfileUrl: dto.ProfileUrl,
 		ProfileID:  dto.ProfileID,
+		// RoboAdvisorPortfolio: nil,
+		// ManualPortfolio:      []models.Portfolio{},
 	}
 	return ps.repo.CreateProfile(&profile)
 }

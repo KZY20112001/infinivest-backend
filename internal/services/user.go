@@ -45,6 +45,7 @@ func (us *userServiceImpl) SignUp(dto dto.AuthRequest) (*dto.TokenResponse, erro
 	if err := us.repo.SignUp(&user); err != nil {
 		return nil, err
 	}
+
 	return us.generateTokens(user.ID)
 }
 

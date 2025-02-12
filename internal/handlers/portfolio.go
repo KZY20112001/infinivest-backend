@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
 	"github.com/KZY20112001/infinivest-backend/internal/services"
@@ -11,10 +12,11 @@ import (
 
 type PortfolioHandler struct {
 	portfolioService services.PortfolioService
+	genAIService     services.GenAIService
 }
 
-func NewPortfolioHandler(ps services.PortfolioService) *PortfolioHandler {
-	return &PortfolioHandler{portfolioService: ps}
+func NewPortfolioHandler(ps services.PortfolioService, gs services.GenAIService) *PortfolioHandler {
+	return &PortfolioHandler{portfolioService: ps, genAIService: gs}
 }
 
 func (h *PortfolioHandler) GenerateRoboAdvisorPortfolio(c *gin.Context) {
@@ -31,7 +33,7 @@ func (h *PortfolioHandler) GenerateRoboAdvisorPortfolio(c *gin.Context) {
 		return
 	}
 
-	recommendation, err := h.portfolioService.GenerateRoboAdvisorPortfolio(bankStatement, bankName, riskToleranceLevel)
+	recommendation, err := h.genAIService.GenerateRoboAdvisorPortfolio(bankStatement, bankName, riskToleranceLevel)
 	if err != nil {
 		HandleError(c, err)
 		return
@@ -46,11 +48,49 @@ func (h *PortfolioHandler) GenerateAssetAllocation(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	assetAllocations, err := h.portfolioService.GenerateAssetAllocations(req)
+	assetAllocations, err := h.genAIService.GenerateAssetAllocations(req)
 	if err != nil {
 		HandleError(c, err)
 		return
 	}
 
 	c.JSON(http.StatusOK, assetAllocations)
+}
+
+func (h *PortfolioHandler) ConfirmGeneratedRoboPortfolio(c *gin.Context) {
+	var req dto.ConfirmPortfolioRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userID := c.GetUint("id")
+	err := h.portfolioService.ConfirmGeneratedRoboPortfolio(req, userID)
+	if err != nil {
+		HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully created the portfolio"})
+}
+
+// not used, for testing only
+func (h *PortfolioHandler) GetPortfolio(c *gin.Context) {
+	userIDStr := c.Param("user_id")
+	portfolioIDStr := c.Param("portfolio_id")
+
+	userID, err := strconv.ParseUint(userIDStr, 10, 64)
+	if err != nil {
+		HandleError(c, fmt.Errorf("invalid user id"))
+	}
+	portfolioID, err := strconv.ParseUint(portfolioIDStr, 10, 64)
+	if err != nil {
+		HandleError(c, fmt.Errorf("invalid portfolio id"))
+	}
+
+	portfolio, err := h.portfolioService.GetPortfolio(uint(portfolioID), uint(userID))
+	if err != nil {
+		HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"portfolio": portfolio})
 }

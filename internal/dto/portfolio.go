@@ -33,3 +33,8 @@ type Assets struct {
 type AssetAllocationResponse struct {
 	Allocations map[string]Assets `json:"allocations"`
 }
+
+type ConfirmPortfolioRequest struct {
+	Portfolio   map[string]float64 `json:"portfolio"`
+	Allocations map[string]Assets  `json:"allocations"`
+}
