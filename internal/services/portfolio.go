@@ -1,76 +1,72 @@
 package services
 
 import (
-	"fmt"
-	"mime/multipart"
-	"sync"
+	"strconv"
 
+	"github.com/KZY20112001/infinivest-backend/internal/constants"
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
+	"github.com/KZY20112001/infinivest-backend/internal/models"
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 )
 
 type PortfolioService interface {
-	GenerateRoboAdvisorPortfolio(bankStatement *multipart.FileHeader, bankName, toleranceLevel string) (dto.RoboAdvisorRecommendationResponse, error)
-	GenerateAssetAllocations(dto dto.AssetAllocationRequest) (dto.AssetAllocationResponse, error)
+	ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error
+	GetRoboPortfolio(userID uint) (*models.Portfolio, error)
+	GetManualPortfolios(userID uint) ([]models.Portfolio, error)
+	GetPortfolio(portfolioID, userID uint) (*models.Portfolio, error)
 }
 
 type portfolioServiceImpl struct {
-	repo repositories.GenAIRepository
+	repo           repositories.PortfolioRepo
+	profileService ProfileService
 }
 
-type CategoryResult struct {
-	Category string
-	Assets   dto.Assets
-	Error    error
+func NewPortfolioService(pr repositories.PortfolioRepo, ps ProfileService) *portfolioServiceImpl {
+	return &portfolioServiceImpl{repo: pr, profileService: ps}
 }
 
-func NewPortfolioServiceImpl(r repositories.GenAIRepository) *portfolioServiceImpl {
-	return &portfolioServiceImpl{repo: r}
-}
-
-func (s *portfolioServiceImpl) GenerateRoboAdvisorPortfolio(bankStatement *multipart.FileHeader, bankName, toleranceLevel string) (dto.RoboAdvisorRecommendationResponse, error) {
-	return s.repo.GeneratePortfolioRecommendation(bankStatement, bankName, toleranceLevel)
-}
-
-func (s *portfolioServiceImpl) GenerateAssetAllocations(req dto.AssetAllocationRequest) (dto.AssetAllocationResponse, error) {
-
-	resChan := make(chan CategoryResult, len(req.Portfolio))
-
-	var wg sync.WaitGroup
-	for category, percentage := range req.Portfolio {
-
-		wg.Add(1)
-		go s.generateAssetAllocation(category, percentage, &wg, resChan)
+func (s *portfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error {
+	_, err := s.repo.GetRoboPortfolio(userID)
+	if err == nil {
+		return constants.ErrDuplicate
+	}
+	portfolio := models.Portfolio{
+		UserID:        userID,
+		Name:          strconv.FormatUint(uint64(userID), 10) + " Robo Advisor Portfolio",
+		IsRoboAdvisor: true,
+		Category:      []models.PortfolioCategory{},
 	}
 
-	wg.Wait()
-	close(resChan)
-	allocations := make(map[string]dto.Assets)
-	var errorList []string
-
-	for res := range resChan {
-		if res.Error != nil {
-			errorList = append(errorList, fmt.Sprintf("%s: %v", res.Category, res.Error))
-		} else {
-			allocations[res.Category] = res.Assets
+	for categoryName, assets := range req.Allocations {
+		category := models.PortfolioCategory{
+			PortfolioUserID: userID,
+			PortfolioID:     portfolio.ID,
+			Name:            categoryName,
+			TotalPercentage: req.Portfolio[categoryName],
+			Assets:          []models.PortfolioAsset{},
 		}
+
+		for _, asset := range assets.Assets {
+			category.Assets = append(category.Assets, models.PortfolioAsset{
+				PortfolioCategoryID: category.ID,
+				Symbol:              asset.Symbol,
+				Percentage:          asset.Percentage,
+			})
+		}
+
+		portfolio.Category = append(portfolio.Category, category)
 	}
-	if len(errorList) > 0 {
-		return dto.AssetAllocationResponse{}, fmt.Errorf("failed to generate asset allocation for categories: %v", errorList)
-	}
-	return dto.AssetAllocationResponse{Allocations: allocations}, nil
+	return s.repo.CreatePortfolio(&portfolio)
 }
 
-func (s *portfolioServiceImpl) generateAssetAllocation(category string, percentage float64, wg *sync.WaitGroup, resChan chan<- CategoryResult) {
-	defer wg.Done()
-	if percentage == 0 {
-		resChan <- CategoryResult{Category: category, Assets: dto.Assets{Assets: []dto.Asset{}}}
-		return
-	}
-	assets, err := s.repo.GenerateAssetAllocation(category, percentage)
-	if err != nil {
-		resChan <- CategoryResult{Category: category, Error: err}
-	} else {
-		resChan <- CategoryResult{Category: category, Assets: assets}
-	}
+func (s *portfolioServiceImpl) GetRoboPortfolio(userID uint) (*models.Portfolio, error) {
+	return s.repo.GetRoboPortfolio(userID)
+}
+
+func (s *portfolioServiceImpl) GetManualPortfolios(userID uint) ([]models.Portfolio, error) {
+	return s.repo.GetManualPortfolios(userID)
+}
+
+func (s *portfolioServiceImpl) GetPortfolio(portfolioID, userID uint) (*models.Portfolio, error) {
+	return s.repo.GetPortfolio(portfolioID, userID)
 }

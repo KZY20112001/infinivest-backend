@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os/signal"
@@ -36,7 +35,7 @@ func init() {
 	if err != nil {
 		log.Fatalf("error in connecting to database: %v", err.Error())
 	}
-	postgresDB.AutoMigrate(&models.User{}, &models.Profile{})
+	postgresDB.AutoMigrate(&models.User{}, &models.Profile{}, &models.Portfolio{}, &models.PortfolioCategory{}, &models.PortfolioAsset{})
 
 	// redisClient, err = db.ConnectToRedis()
 	// if err != nil {
@@ -49,9 +48,9 @@ func initUserService(db *gorm.DB) services.UserService {
 	return services.NewUserServiceImpl(repo)
 }
 
-func initProfileService(db *gorm.DB, userService services.UserService) services.ProfileService {
+func initProfileService(db *gorm.DB, us services.UserService) services.ProfileService {
 	repo := repositories.NewPostgresProfileRepo(db)
-	return services.NewProfileServiceImpl(repo, userService)
+	return services.NewProfileServiceImpl(repo, us)
 }
 
 func initS3Service(client *s3.PresignClient) services.S3Service {
@@ -59,20 +58,26 @@ func initS3Service(client *s3.PresignClient) services.S3Service {
 	return services.NewS3ServiceImpl(repo)
 }
 
-func initPortfolioService() services.PortfolioService {
+func initGenAIService() services.GenAIService {
 	baseUrl := "http://localhost:5000"
-	repo := repositories.NewFlaskMicroservice(baseUrl)
-	return services.NewPortfolioServiceImpl(repo)
+	genAIRepo := repositories.NewFlaskMicroservice(baseUrl)
+	return services.NewGenAIService(genAIRepo)
+}
+
+func initPortfolioService(db *gorm.DB, ps services.ProfileService) services.PortfolioService {
+	portfolioRepo := repositories.NewPostgresPortfolioRepo(db)
+	return services.NewPortfolioService(portfolioRepo, ps)
 }
 
 func initHandlers(db *gorm.DB, s3Client *s3.PresignClient) (*handlers.UserHandler, *handlers.ProfileHandler, *handlers.PortfolioHandler, *handlers.S3Handler) {
+	genAIService := initGenAIService()
 	s3Service := initS3Service(s3Client)
 	userService := initUserService(db)
 	profileService := initProfileService(db, userService)
-	portfolioService := initPortfolioService()
+	portfolioService := initPortfolioService(db, profileService)
 	return handlers.NewUserHandler(userService),
 		handlers.NewProfileHandler(profileService),
-		handlers.NewPortfolioHandler(portfolioService),
+		handlers.NewPortfolioHandler(portfolioService, genAIService),
 		handlers.NewS3Handler(s3Service)
 }
 
@@ -99,7 +104,7 @@ func main() {
 		if err := srv.ListenAndServe(); err != nil {
 			log.Printf("listen: %s\n", err)
 		}
-		fmt.Println("Server started")
+		log.Println("Server started")
 	}()
 
 	// Listen for the interrupt signal.

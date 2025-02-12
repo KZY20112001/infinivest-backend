@@ -13,7 +13,8 @@ func RegisterPortfolioRoutes(r *gin.Engine, h *handlers.PortfolioHandler) {
 	{
 		roboAdvisorGroup.POST("/generate/categories", h.GenerateRoboAdvisorPortfolio)
 		roboAdvisorGroup.POST("/generate/assets", h.GenerateAssetAllocation)
-		roboAdvisorGroup.GET("/")
+		roboAdvisorGroup.POST("/confirm", h.ConfirmGeneratedRoboPortfolio)
+		roboAdvisorGroup.GET("/:user_id/:portfolio_id", h.GetPortfolio)
 	}
 
 	manualGroup := portfolioGroup.Group("/manual")
