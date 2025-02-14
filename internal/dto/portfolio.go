@@ -38,3 +38,7 @@ type ConfirmPortfolioRequest struct {
 	Portfolio   map[string]float64 `json:"portfolio"`
 	Allocations map[string]Assets  `json:"allocations"`
 }
+
+type AddMoneyRequest struct {
+	Amount float64 `json:"amount"`
+}

@@ -25,12 +25,12 @@ func NewPostgresUserRepo(db *gorm.DB) *postgresUserRepo {
 	}
 }
 
-func (ptr *postgresUserRepo) SignUp(user *models.User) error {
+func (r *postgresUserRepo) SignUp(user *models.User) error {
 	if user == nil {
 		return constants.ErrNil
 	}
 
-	if err := ptr.db.Create(&user).Error; err != nil {
+	if err := r.db.Create(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return constants.ErrDuplicate
 		}
@@ -39,9 +39,9 @@ func (ptr *postgresUserRepo) SignUp(user *models.User) error {
 	return nil
 }
 
-func (ptr *postgresUserRepo) GetUser(id uint) (*models.User, error) {
+func (r *postgresUserRepo) GetUser(id uint) (*models.User, error) {
 	var user models.User
-	if err := ptr.db.Where("ID = ?", id).First(&user).Error; err != nil {
+	if err := r.db.Where("ID = ?", id).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, constants.ErrNotFound
 		}
@@ -54,9 +54,9 @@ func (ptr *postgresUserRepo) GetUser(id uint) (*models.User, error) {
 	return &user, nil
 }
 
-func (ptr *postgresUserRepo) GetUserByEmail(email string) (*models.User, error) {
+func (r *postgresUserRepo) GetUserByEmail(email string) (*models.User, error) {
 	var user models.User
-	if err := ptr.db.Where("Email = ?", email).First(&user).Error; err != nil {
+	if err := r.db.Where("Email = ?", email).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, constants.ErrNotFound
 		}

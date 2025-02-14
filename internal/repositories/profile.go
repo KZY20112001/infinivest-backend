@@ -22,11 +22,11 @@ func NewPostgresProfileRepo(db *gorm.DB) *postgresProfileRepo {
 	return &postgresProfileRepo{db: db}
 }
 
-func (ptr *postgresProfileRepo) CreateProfile(profile *models.Profile) error {
+func (r *postgresProfileRepo) CreateProfile(profile *models.Profile) error {
 	if profile == nil {
 		return constants.ErrNil
 	}
-	if err := ptr.db.Create(&profile).Error; err != nil {
+	if err := r.db.Create(&profile).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return constants.ErrDuplicate
 		}
@@ -35,16 +35,16 @@ func (ptr *postgresProfileRepo) CreateProfile(profile *models.Profile) error {
 	return nil
 }
 
-func (ptr *postgresProfileRepo) UpdateProfile(updatedProfile *models.Profile) error {
-	if err := ptr.db.Save(&updatedProfile).Error; err != nil {
+func (r *postgresProfileRepo) UpdateProfile(updatedProfile *models.Profile) error {
+	if err := r.db.Save(&updatedProfile).Error; err != nil {
 		return err
 	}
 	return nil
 }
 
-func (ptr *postgresProfileRepo) GetProfile(userID uint) (*models.Profile, error) {
+func (r *postgresProfileRepo) GetProfile(userID uint) (*models.Profile, error) {
 	var profile models.Profile
-	if err := ptr.db.Preload("User").Where("user_id = ?", userID).First(&profile).Error; err != nil {
+	if err := r.db.Preload("User").Where("user_id = ?", userID).First(&profile).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, constants.ErrNotFound
 		}

@@ -15,6 +15,7 @@ import (
 type GenAIRepository interface {
 	GeneratePortfolioRecommendation(bankStatement *multipart.FileHeader, bankName, toleranceLevel string) (dto.RoboAdvisorRecommendationResponse, error)
 	GenerateAssetAllocation(category string, percentage float64) (dto.Assets, error)
+	GetLatestAssetPrice(symbol string) (float64, error)
 }
 
 type flaskMicroservice struct {
@@ -118,4 +119,24 @@ func (r *flaskMicroservice) GenerateAssetAllocation(category string, percentage 
 		return dto.Assets{}, err
 	}
 	return assets, nil
+}
+
+func (r *flaskMicroservice) GetLatestAssetPrice(symbol string) (float64, error) {
+	url := fmt.Sprintf("%s/assets/latest-price/%s", r.baseURL, symbol)
+	resp, err := http.Get(url)
+	if err != nil {
+		return 0, err
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return 0, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var price float64
+	if err := json.NewDecoder(resp.Body).Decode(&price); err != nil {
+		return 0, err
+	}
+	return price, nil
 }

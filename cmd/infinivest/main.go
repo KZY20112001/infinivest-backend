@@ -64,9 +64,9 @@ func initGenAIService() services.GenAIService {
 	return services.NewGenAIService(genAIRepo)
 }
 
-func initPortfolioService(db *gorm.DB, ps services.ProfileService) services.PortfolioService {
+func initPortfolioService(db *gorm.DB, ps services.ProfileService, gs services.GenAIService) services.PortfolioService {
 	portfolioRepo := repositories.NewPostgresPortfolioRepo(db)
-	return services.NewPortfolioService(portfolioRepo, ps)
+	return services.NewPortfolioService(portfolioRepo, ps, gs)
 }
 
 func initHandlers(db *gorm.DB, s3Client *s3.PresignClient) (*handlers.UserHandler, *handlers.ProfileHandler, *handlers.PortfolioHandler, *handlers.S3Handler) {
@@ -74,7 +74,7 @@ func initHandlers(db *gorm.DB, s3Client *s3.PresignClient) (*handlers.UserHandle
 	s3Service := initS3Service(s3Client)
 	userService := initUserService(db)
 	profileService := initProfileService(db, userService)
-	portfolioService := initPortfolioService(db, profileService)
+	portfolioService := initPortfolioService(db, profileService, genAIService)
 	return handlers.NewUserHandler(userService),
 		handlers.NewProfileHandler(profileService),
 		handlers.NewPortfolioHandler(portfolioService, genAIService),
@@ -83,7 +83,6 @@ func initHandlers(db *gorm.DB, s3Client *s3.PresignClient) (*handlers.UserHandle
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-southeast-1"))
 	if err != nil {
@@ -109,14 +108,13 @@ func main() {
 
 	// Listen for the interrupt signal.
 	<-ctx.Done()
-
 	// Restore default behavior on the interrupt signal and notify user of shutdown.
 	stop()
 	log.Println("shutting down gracefully, press Ctrl+C again to force")
 
 	// The context is used to inform the server it has 5 seconds to finish
 	// the request it is currently handling
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatal("Server forced to shutdown: ", err)

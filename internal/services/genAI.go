@@ -12,6 +12,7 @@ import (
 type GenAIService interface {
 	GenerateRoboAdvisorPortfolio(bankStatement *multipart.FileHeader, bankName, toleranceLevel string) (dto.RoboAdvisorRecommendationResponse, error)
 	GenerateAssetAllocations(req dto.AssetAllocationRequest) (dto.AssetAllocationResponse, error)
+	GetLatestAssetPrice(symbol string) (float64, error)
 }
 
 type genAIServiceImpl struct {
@@ -59,6 +60,10 @@ func (s *genAIServiceImpl) GenerateAssetAllocations(req dto.AssetAllocationReque
 		return dto.AssetAllocationResponse{}, fmt.Errorf("failed to generate asset allocation for categories: %v", errorList)
 	}
 	return dto.AssetAllocationResponse{Allocations: allocations}, nil
+}
+
+func (s *genAIServiceImpl) GetLatestAssetPrice(symbol string) (float64, error) {
+	return s.repo.GetLatestAssetPrice(symbol)
 }
 
 func (s *genAIServiceImpl) generateAssetAllocation(category string, percentage float64, wg *sync.WaitGroup, resChan chan<- CategoryResult) {

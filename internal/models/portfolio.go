@@ -7,7 +7,7 @@ type Portfolio struct {
 	UserID        uint `gorm:"primaryKey"`
 	Name          string
 	IsRoboAdvisor bool
-	Category      []PortfolioCategory
+	Category      []*PortfolioCategory
 }
 
 type PortfolioCategory struct {
@@ -16,7 +16,8 @@ type PortfolioCategory struct {
 	PortfolioUserID uint `gorm:"not null"`
 	Name            string
 	TotalPercentage float64
-	Assets          []PortfolioAsset
+	TotalAmount     float64
+	Assets          []*PortfolioAsset
 }
 
 type PortfolioAsset struct {
@@ -24,4 +25,8 @@ type PortfolioAsset struct {
 	PortfolioCategoryID uint `gorm:"not null"`
 	Symbol              string
 	Percentage          float64
+
+	SharesOwned   float64
+	TotalInvested float64
+	AvgBuyPrice   float64
 }
