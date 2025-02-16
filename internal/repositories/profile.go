@@ -28,7 +28,7 @@ func (r *postgresProfileRepo) CreateProfile(profile *models.Profile) error {
 	}
 	if err := r.db.Create(&profile).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return constants.ErrDuplicate
+			return gorm.ErrDuplicatedKey
 		}
 		return err
 	}
@@ -46,10 +46,10 @@ func (r *postgresProfileRepo) GetProfile(userID uint) (*models.Profile, error) {
 	var profile models.Profile
 	if err := r.db.Preload("User").Where("user_id = ?", userID).First(&profile).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, constants.ErrNotFound
+			return nil, gorm.ErrRecordNotFound
 		}
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return nil, constants.ErrDuplicate
+			return nil, gorm.ErrDuplicatedKey
 		}
 		return nil, err
 	}

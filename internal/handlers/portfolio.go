@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
 	"github.com/KZY20112001/infinivest-backend/internal/services"
@@ -19,7 +18,6 @@ func NewPortfolioHandler(ps services.PortfolioService, gs services.GenAIService)
 	return &PortfolioHandler{portfolioService: ps, genAIService: gs}
 }
 
-// handlers for robo-portfolio
 func (h *PortfolioHandler) GenerateRoboAdvisorPortfolio(c *gin.Context) {
 	bankName := c.PostForm("bank_name")
 	riskToleranceLevel := c.PostForm("risk_tolerance_level")
@@ -100,6 +98,22 @@ func (h *PortfolioHandler) AddMoneyToRoboPortfolio(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"portfolio": portfolio})
 }
 
+func (h *PortfolioHandler) UpdateRebalanceFreq(c *gin.Context) {
+	var req dto.UpdateRebalanceFreqRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userID := c.GetUint("id")
+	err := h.portfolioService.UpdateRebalanceFreq(userID, req.Frequency)
+	if err != nil {
+		HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully updated the rebalance frequency"})
+}
+
 // handlers for manual-portfolios
 func (h *PortfolioHandler) GetManualPortfolios(c *gin.Context) {
 	userID := c.GetUint("id")
@@ -109,26 +123,4 @@ func (h *PortfolioHandler) GetManualPortfolios(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"portfolios": portfolios})
-}
-
-// not used, for testing only
-func (h *PortfolioHandler) GetPortfolio(c *gin.Context) {
-	userIDStr := c.Param("user_id")
-	portfolioIDStr := c.Param("portfolio_id")
-
-	userID, err := strconv.ParseUint(userIDStr, 10, 64)
-	if err != nil {
-		HandleError(c, fmt.Errorf("invalid user id"))
-	}
-	portfolioID, err := strconv.ParseUint(portfolioIDStr, 10, 64)
-	if err != nil {
-		HandleError(c, fmt.Errorf("invalid portfolio id"))
-	}
-
-	portfolio, err := h.portfolioService.GetPortfolio(uint(portfolioID), uint(userID))
-	if err != nil {
-		HandleError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"portfolio": portfolio})
 }

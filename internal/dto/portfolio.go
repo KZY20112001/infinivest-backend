@@ -42,3 +42,7 @@ type ConfirmPortfolioRequest struct {
 type AddMoneyRequest struct {
 	Amount float64 `json:"amount"`
 }
+
+type UpdateRebalanceFreqRequest struct {
+	Frequency string `json:"frequency"`
+}

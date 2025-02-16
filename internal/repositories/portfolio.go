@@ -12,9 +12,9 @@ import (
 type PortfolioRepo interface {
 	CreatePortfolio(portfolio *models.Portfolio) error
 	GetRoboPortfolio(userID uint) (*models.Portfolio, error)
+	UpdateRebalanceFreq(userID uint, freq string) error
 	GetManualPortfolios(userID uint) ([]models.Portfolio, error)
 	UpdatePortfolio(portfolio *models.Portfolio) error
-	GetPortfolio(portfolioID uint, userID uint) (*models.Portfolio, error)
 }
 
 type postgresPortfolioRepo struct {
@@ -31,7 +31,7 @@ func (r *postgresPortfolioRepo) CreatePortfolio(portfolio *models.Portfolio) err
 	}
 	if err := r.db.Create(&portfolio).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return constants.ErrDuplicate
+			return gorm.ErrDuplicatedKey
 		}
 		return err
 	}
@@ -48,7 +48,11 @@ func (r *postgresPortfolioRepo) GetRoboPortfolio(userID uint) (*models.Portfolio
 		First(&portfolio).Error; err != nil {
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, constants.ErrNotFound
+			return nil, gorm.ErrRecordNotFound
+		}
+
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, gorm.ErrDuplicatedKey
 		}
 		return nil, err
 	}
@@ -66,8 +70,8 @@ func (r *postgresPortfolioRepo) GetManualPortfolios(userID uint) ([]models.Portf
 	return portfolios, nil
 }
 
-func (ptr *postgresPortfolioRepo) UpdatePortfolio(portfolio *models.Portfolio) error {
-	tx := ptr.db.Begin()
+func (r *postgresPortfolioRepo) UpdatePortfolio(portfolio *models.Portfolio) error {
+	tx := r.db.Begin()
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -102,20 +106,16 @@ func (ptr *postgresPortfolioRepo) UpdatePortfolio(portfolio *models.Portfolio) e
 	return nil
 }
 
-func (r *postgresPortfolioRepo) GetPortfolio(portfolioID uint, userID uint) (*models.Portfolio, error) {
-	var portfolio models.Portfolio
-
-	if err := r.db.
-		Where("id = ? AND user_id = ?", portfolioID, userID).
-		Preload("Category").
-		Preload("Category.Assets").
-		First(&portfolio).Error; err != nil {
-
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, constants.ErrNotFound
-		}
-		return nil, err
+func (r *postgresPortfolioRepo) UpdateRebalanceFreq(userID uint, freq string) error {
+	portfolio, err := r.GetRoboPortfolio(userID)
+	if err != nil {
+		return err
 	}
-
-	return &portfolio, nil
+	if err := r.db.Model(&portfolio).Update("rebalance_freq", freq).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return gorm.ErrDuplicatedKey
+		}
+		return err
+	}
+	return nil
 }

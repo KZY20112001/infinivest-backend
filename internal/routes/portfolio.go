@@ -10,9 +10,6 @@ func RegisterPortfolioRoutes(r *gin.Engine, h *handlers.PortfolioHandler) {
 	portfolioGroup := r.Group("/portfolio")
 	portfolioGroup.Use(middlewares.AuthMiddleware())
 
-	// for testing only
-	portfolioGroup.GET("/:user_id/:portfolio_id", h.GetPortfolio)
-
 	roboAdvisorGroup := portfolioGroup.Group("/robo-advisor")
 	{
 		roboAdvisorGroup.POST("/generate/categories", h.GenerateRoboAdvisorPortfolio)
@@ -20,7 +17,7 @@ func RegisterPortfolioRoutes(r *gin.Engine, h *handlers.PortfolioHandler) {
 		roboAdvisorGroup.POST("/confirm", h.ConfirmGeneratedRoboPortfolio)
 		roboAdvisorGroup.GET("/", h.GetRoboPortfolio)
 		roboAdvisorGroup.POST("/", h.AddMoneyToRoboPortfolio)
-
+		roboAdvisorGroup.PUT("/rebalance-freq", h.UpdateRebalanceFreq)
 	}
 
 	manualGroup := portfolioGroup.Group("/manual")

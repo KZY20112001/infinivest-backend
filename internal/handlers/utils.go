@@ -11,10 +11,7 @@ import (
 func HandleError(c *gin.Context, err error) {
 	if err != nil {
 		switch err {
-		case constants.ErrDuplicate:
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		case constants.ErrNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+
 		case constants.ErrInternal:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		case constants.ErrNil:

@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/KZY20112001/infinivest-backend/internal/constants"
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
@@ -15,11 +14,9 @@ type PortfolioService interface {
 	ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error
 	GetRoboPortfolio(userID uint) (*models.Portfolio, error)
 	AddMoneyToRoboPortfolio(userID uint, amount float64) (*models.Portfolio, error)
+	UpdateRebalanceFreq(userID uint, freq string) error
 
 	GetManualPortfolios(userID uint) ([]models.Portfolio, error)
-
-	//to be removed, for testing only
-	GetPortfolio(portfolioID, userID uint) (*models.Portfolio, error)
 }
 
 type portfolioServiceImpl struct {
@@ -35,14 +32,27 @@ func NewPortfolioService(pr repositories.PortfolioRepo, ps ProfileService, gs Ge
 func (s *portfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error {
 	_, err := s.repo.GetRoboPortfolio(userID)
 	if err == nil {
-		return constants.ErrDuplicate
+		return err
 	}
+
 	portfolio := models.Portfolio{
 		UserID:        userID,
 		Name:          strconv.FormatUint(uint64(userID), 10) + " Robo Advisor Portfolio",
 		IsRoboAdvisor: true,
 		Category:      []*models.PortfolioCategory{},
+		RebalanceFreq: nil,
 	}
+
+	// manually append cash category (no assets)
+	cashCategory := &models.PortfolioCategory{
+		PortfolioUserID: userID,
+		PortfolioID:     portfolio.ID,
+		Name:            "cash",
+		TotalPercentage: req.Portfolio["cash"],
+		TotalAmount:     0,
+		Assets:          []*models.PortfolioAsset{},
+	}
+	portfolio.Category = append(portfolio.Category, cashCategory)
 
 	for categoryName, assets := range req.Allocations {
 		category := &models.PortfolioCategory{
@@ -82,13 +92,12 @@ func (s *portfolioServiceImpl) AddMoneyToRoboPortfolio(userID uint, amount float
 	return s.addMoneyToPortfolio(portfolio, amount)
 }
 
-func (s *portfolioServiceImpl) GetManualPortfolios(userID uint) ([]models.Portfolio, error) {
-	return s.repo.GetManualPortfolios(userID)
+func (s *portfolioServiceImpl) UpdateRebalanceFreq(userID uint, freq string) error {
+	return s.repo.UpdateRebalanceFreq(userID, freq)
 }
 
-// this func is for testing only, will be removed
-func (s *portfolioServiceImpl) GetPortfolio(portfolioID, userID uint) (*models.Portfolio, error) {
-	return s.repo.GetPortfolio(portfolioID, userID)
+func (s *portfolioServiceImpl) GetManualPortfolios(userID uint) ([]models.Portfolio, error) {
+	return s.repo.GetManualPortfolios(userID)
 }
 
 // utility functions

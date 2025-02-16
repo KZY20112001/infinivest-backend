@@ -32,7 +32,7 @@ func (r *postgresUserRepo) SignUp(user *models.User) error {
 
 	if err := r.db.Create(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return constants.ErrDuplicate
+			return gorm.ErrDuplicatedKey
 		}
 		return err
 	}
@@ -43,10 +43,10 @@ func (r *postgresUserRepo) GetUser(id uint) (*models.User, error) {
 	var user models.User
 	if err := r.db.Where("ID = ?", id).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, constants.ErrNotFound
+			return nil, gorm.ErrRecordNotFound
 		}
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return nil, constants.ErrDuplicate
+			return nil, gorm.ErrDuplicatedKey
 		}
 		return nil, err
 	}
@@ -58,10 +58,10 @@ func (r *postgresUserRepo) GetUserByEmail(email string) (*models.User, error) {
 	var user models.User
 	if err := r.db.Where("Email = ?", email).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, constants.ErrNotFound
+			return nil, gorm.ErrRecordNotFound
 		}
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return nil, constants.ErrDuplicate
+			return nil, gorm.ErrDuplicatedKey
 		}
 		return nil, err
 	}

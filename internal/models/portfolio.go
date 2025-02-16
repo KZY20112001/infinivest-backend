@@ -8,6 +8,7 @@ type Portfolio struct {
 	Name          string
 	IsRoboAdvisor bool
 	Category      []*PortfolioCategory
+	RebalanceFreq *string
 }
 
 type PortfolioCategory struct {
