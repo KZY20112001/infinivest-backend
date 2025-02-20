@@ -66,21 +66,28 @@ func initGenAIService() services.GenAIService {
 	return services.NewGenAIService(genAIRepo)
 }
 
-func initPortfolioService(db *gorm.DB, redis *redis.Client, ps services.ProfileService, gs services.GenAIService) services.PortfolioService {
-	portfolioRepo := repositories.NewPostgresPortfolioRepo(db)
-	portfolioCache := cache.NewPortfolioRedis(redis)
-	return services.NewPortfolioService(portfolioRepo, portfolioCache, ps, gs)
+func initRoboPortfolioService(pr repositories.PortfolioRepo, pc cache.PortfolioCache, ps services.ProfileService, gs services.GenAIService) services.RoboPortfolioService {
+	return services.NewRoboPortfolioService(pr, pc, ps, gs)
 }
 
-func initHandlers(db *gorm.DB, redisClient *redis.Client, s3Client *s3.PresignClient) (*handlers.UserHandler, *handlers.ProfileHandler, *handlers.PortfolioHandler, *handlers.S3Handler) {
+func initManualPortfolioService(pr repositories.PortfolioRepo) services.ManualPortfolioService {
+	return services.NewManualPortfolioService(pr)
+}
+
+func initHandlers(db *gorm.DB, redisClient *redis.Client, s3Client *s3.PresignClient) (*handlers.UserHandler, *handlers.ProfileHandler, *handlers.RoboPortfolioHandler, *handlers.ManualPortfolioHandler, *handlers.S3Handler) {
 	genAIService := initGenAIService()
 	s3Service := initS3Service(s3Client)
 	userService := initUserService(db)
 	profileService := initProfileService(db, userService)
-	portfolioService := initPortfolioService(db, redisClient, profileService, genAIService)
+
+	portfolioRepo := repositories.NewPostgresPortfolioRepo(db)
+	portfolioCache := cache.NewPortfolioRedis(redisClient)
+	roboPortfolioService := initRoboPortfolioService(portfolioRepo, portfolioCache, profileService, genAIService)
+	manualPortfolioService := initManualPortfolioService(portfolioRepo)
 	return handlers.NewUserHandler(userService),
 		handlers.NewProfileHandler(profileService),
-		handlers.NewPortfolioHandler(portfolioService, genAIService),
+		handlers.NewRoboPortfolioHandler(roboPortfolioService, genAIService),
+		handlers.NewManualPortfolioHandler(manualPortfolioService),
 		handlers.NewS3Handler(s3Service)
 }
 
@@ -93,9 +100,9 @@ func main() {
 	}
 	s3Client := s3.NewFromConfig(cfg)
 	presignClient := s3.NewPresignClient(s3Client)
-	userHandler, profileHandler, portfolioHandler, s3Handler := initHandlers(postgresDB, redisClient, presignClient)
+	userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, s3Handler := initHandlers(postgresDB, redisClient, presignClient)
 
-	r := routes.RegisterRoutes(userHandler, profileHandler, portfolioHandler, s3Handler)
+	r := routes.RegisterRoutes(userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, s3Handler)
 	srv := &http.Server{
 		Addr:    ":8080",
 		Handler: r,

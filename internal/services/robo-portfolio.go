@@ -13,27 +13,25 @@ import (
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 )
 
-type PortfolioService interface {
+type RoboPortfolioService interface {
 	ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error
 	GetRoboPortfolio(userID uint) (*models.Portfolio, error)
 	AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.Portfolio, error)
 	UpdateRebalanceFreq(userID uint, freq string) error
-
-	GetManualPortfolios(userID uint) ([]models.Portfolio, error)
 }
 
-type portfolioServiceImpl struct {
+type roboPortfolioServiceImpl struct {
 	repo           repositories.PortfolioRepo
 	cache          cache.PortfolioCache
 	profileService ProfileService
 	genAIService   GenAIService
 }
 
-func NewPortfolioService(pr repositories.PortfolioRepo, pc cache.PortfolioCache, ps ProfileService, gs GenAIService) *portfolioServiceImpl {
-	return &portfolioServiceImpl{repo: pr, cache: pc, profileService: ps, genAIService: gs}
+func NewRoboPortfolioService(pr repositories.PortfolioRepo, pc cache.PortfolioCache, ps ProfileService, gs GenAIService) *roboPortfolioServiceImpl {
+	return &roboPortfolioServiceImpl{repo: pr, cache: pc, profileService: ps, genAIService: gs}
 }
 
-func (s *portfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error {
+func (s *roboPortfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error {
 	_, err := s.repo.GetRoboPortfolio(userID)
 	if err == nil {
 		return err
@@ -84,11 +82,11 @@ func (s *portfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.ConfirmPort
 	return s.repo.CreatePortfolio(&portfolio)
 }
 
-func (s *portfolioServiceImpl) GetRoboPortfolio(userID uint) (*models.Portfolio, error) {
+func (s *roboPortfolioServiceImpl) GetRoboPortfolio(userID uint) (*models.Portfolio, error) {
 	return s.repo.GetRoboPortfolio(userID)
 }
 
-func (s *portfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.Portfolio, error) {
+func (s *roboPortfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.Portfolio, error) {
 	portfolio, err := s.repo.GetRoboPortfolio(userID)
 	if err != nil {
 		return nil, err
@@ -115,16 +113,12 @@ func (s *portfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, user
 	return portfolio, err
 }
 
-func (s *portfolioServiceImpl) UpdateRebalanceFreq(userID uint, freq string) error {
+func (s *roboPortfolioServiceImpl) UpdateRebalanceFreq(userID uint, freq string) error {
 	return s.repo.UpdateRebalanceFreq(userID, freq)
 }
 
-func (s *portfolioServiceImpl) GetManualPortfolios(userID uint) ([]models.Portfolio, error) {
-	return s.repo.GetManualPortfolios(userID)
-}
-
 // utility functions
-func (s *portfolioServiceImpl) addMoneyToPortfolio(portfolio *models.Portfolio, amount float64) error {
+func (s *roboPortfolioServiceImpl) addMoneyToPortfolio(portfolio *models.Portfolio, amount float64) error {
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(portfolio.Category))
 	for _, category := range portfolio.Category {
@@ -152,7 +146,7 @@ func (s *portfolioServiceImpl) addMoneyToPortfolio(portfolio *models.Portfolio, 
 	return nil
 }
 
-func (s *portfolioServiceImpl) updateAsset(asset *models.PortfolioAsset, assetAmount float64, wg *sync.WaitGroup, errCh chan<- error) {
+func (s *roboPortfolioServiceImpl) updateAsset(asset *models.PortfolioAsset, assetAmount float64, wg *sync.WaitGroup, errCh chan<- error) {
 	defer wg.Done()
 	latestPrice, err := s.genAIService.GetLatestAssetPrice(asset.Symbol)
 	if err != nil {

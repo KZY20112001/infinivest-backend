@@ -10,16 +10,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type PortfolioHandler struct {
-	portfolioService services.PortfolioService
+type RoboPortfolioHandler struct {
+	portfolioService services.RoboPortfolioService
 	genAIService     services.GenAIService
 }
 
-func NewPortfolioHandler(ps services.PortfolioService, gs services.GenAIService) *PortfolioHandler {
-	return &PortfolioHandler{portfolioService: ps, genAIService: gs}
+func NewRoboPortfolioHandler(ps services.RoboPortfolioService, gs services.GenAIService) *RoboPortfolioHandler {
+	return &RoboPortfolioHandler{portfolioService: ps, genAIService: gs}
 }
 
-func (h *PortfolioHandler) GenerateRoboAdvisorPortfolio(c *gin.Context) {
+func (h *RoboPortfolioHandler) GenerateRoboAdvisorPortfolio(c *gin.Context) {
 	bankName := c.PostForm("bank_name")
 	riskToleranceLevel := c.PostForm("risk_tolerance_level")
 	if riskToleranceLevel == "" {
@@ -42,7 +42,7 @@ func (h *PortfolioHandler) GenerateRoboAdvisorPortfolio(c *gin.Context) {
 	c.JSON(http.StatusOK, recommendation)
 }
 
-func (h *PortfolioHandler) GenerateAssetAllocation(c *gin.Context) {
+func (h *RoboPortfolioHandler) GenerateAssetAllocation(c *gin.Context) {
 	var req dto.AssetAllocationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -57,7 +57,7 @@ func (h *PortfolioHandler) GenerateAssetAllocation(c *gin.Context) {
 	c.JSON(http.StatusOK, assetAllocations)
 }
 
-func (h *PortfolioHandler) ConfirmGeneratedRoboPortfolio(c *gin.Context) {
+func (h *RoboPortfolioHandler) ConfirmGeneratedRoboPortfolio(c *gin.Context) {
 	var req dto.ConfirmPortfolioRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -77,7 +77,7 @@ func (h *PortfolioHandler) ConfirmGeneratedRoboPortfolio(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully created the portfolio"})
 }
 
-func (h *PortfolioHandler) GetRoboPortfolio(c *gin.Context) {
+func (h *RoboPortfolioHandler) GetRoboPortfolio(c *gin.Context) {
 	userID := c.GetUint("id")
 	portfolio, err := h.portfolioService.GetRoboPortfolio(userID)
 	if err != nil {
@@ -87,7 +87,7 @@ func (h *PortfolioHandler) GetRoboPortfolio(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"portfolio": portfolio})
 }
 
-func (h *PortfolioHandler) AddMoneyToRoboPortfolio(c *gin.Context) {
+func (h *RoboPortfolioHandler) AddMoneyToRoboPortfolio(c *gin.Context) {
 	var req dto.AddMoneyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -103,7 +103,7 @@ func (h *PortfolioHandler) AddMoneyToRoboPortfolio(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"portfolio": portfolio})
 }
 
-func (h *PortfolioHandler) UpdateRebalanceFreq(c *gin.Context) {
+func (h *RoboPortfolioHandler) UpdateRebalanceFreq(c *gin.Context) {
 	var req dto.UpdateRebalanceFreqRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -120,15 +120,4 @@ func (h *PortfolioHandler) UpdateRebalanceFreq(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully updated the rebalance frequency"})
-}
-
-// handlers for manual-portfolios
-func (h *PortfolioHandler) GetManualPortfolios(c *gin.Context) {
-	userID := c.GetUint("id")
-	portfolios, err := h.portfolioService.GetManualPortfolios(userID)
-	if err != nil {
-		commons.HandleError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"portfolios": portfolios})
 }
