@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/KZY20112001/infinivest-backend/internal/conf"
 	"github.com/KZY20112001/infinivest-backend/internal/db"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
 	"github.com/KZY20112001/infinivest-backend/internal/routes"
@@ -44,15 +45,41 @@ func init() {
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-
+	defer stop()
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-southeast-1"))
 	if err != nil {
 		log.Fatalf("unable to load SDK config, %v", err)
 	}
+
+	appConf := conf.LoadConfig()
+
 	s3Client := s3.NewFromConfig(cfg)
 	presignClient := s3.NewPresignClient(s3Client)
-	userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, s3Handler := setup.InitHandlers(postgresDB, redisClient, presignClient)
 
+	// init repositories
+	userRepo, profileRepo, portfolioRepo, s3Repo, genAIRepo := setup.Repositories(
+		postgresDB, presignClient, appConf.FlaskMicroserviceURL,
+	)
+
+	// init caches
+	portfolioCache := setup.Caches(redisClient)
+
+	// init services
+	userService, profileService, roboPortfolioService, manualPortfolioService, s3Service, genAIService := setup.Services(
+		portfolioCache, userRepo, profileRepo, portfolioRepo, s3Repo, genAIRepo,
+	)
+
+	// init handlers
+	userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, s3Handler := setup.Handlers(
+		userService, profileService, roboPortfolioService, manualPortfolioService, s3Service, genAIService,
+	)
+
+	// init schedulers
+	portfolioScheduler := setup.PortfolioScheduler(
+		roboPortfolioService, portfolioRepo, portfolioCache,
+	)
+
+	portfolioScheduler.Start()
 	r := routes.RegisterRoutes(userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, s3Handler)
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -70,7 +97,6 @@ func main() {
 	// Listen for the interrupt signal.
 	<-ctx.Done()
 	// Restore default behavior on the interrupt signal and notify user of shutdown.
-	stop()
 	log.Println("shutting down gracefully, press Ctrl+C again to force")
 
 	// The context is used to inform the server it has 5 seconds to finish

@@ -1,7 +1,7 @@
 package services
 
 import (
-	"github.com/KZY20112001/infinivest-backend/internal/cache"
+	"github.com/KZY20112001/infinivest-backend/internal/caches"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 )
@@ -12,11 +12,11 @@ type ManualPortfolioService interface {
 
 type manualPortfolioServiceImpl struct {
 	repo           repositories.PortfolioRepo
-	cache          cache.PortfolioCache
+	cache          caches.PortfolioCache
 	profileService ProfileService
 }
 
-func NewManualPortfolioService(pr repositories.PortfolioRepo, pc cache.PortfolioCache, ps ProfileService) *manualPortfolioServiceImpl {
+func NewManualPortfolioService(pr repositories.PortfolioRepo, pc caches.PortfolioCache, ps ProfileService) *manualPortfolioServiceImpl {
 	return &manualPortfolioServiceImpl{repo: pr, cache: pc, profileService: ps}
 }
 

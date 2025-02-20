@@ -1,38 +1,41 @@
 package setup
 
 import (
-	"github.com/KZY20112001/infinivest-backend/internal/cache"
+	"github.com/KZY20112001/infinivest-backend/internal/caches"
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 	"github.com/KZY20112001/infinivest-backend/internal/services"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"gorm.io/gorm"
 )
 
-func InitUserService(db *gorm.DB) services.UserService {
-	repo := repositories.NewPostgresUserRepo(db)
-	return services.NewUserServiceImpl(repo)
-}
+func Services(
+	portfolioCache caches.PortfolioCache,
+	userRepo repositories.UserRepo,
+	profileRepo repositories.ProfileRepo,
+	portfolioRepo repositories.PortfolioRepo,
+	s3Repo repositories.S3Repository,
+	genAIRepo repositories.GenAIRepository,
+) (
+	services.UserService,
+	services.ProfileService,
+	services.RoboPortfolioService,
+	services.ManualPortfolioService,
+	services.S3Service,
+	services.GenAIService,
+) {
+	userService := services.NewUserServiceImpl(userRepo)
 
-func InitProfileService(db *gorm.DB, us services.UserService) services.ProfileService {
-	repo := repositories.NewPostgresProfileRepo(db)
-	return services.NewProfileServiceImpl(repo, us)
-}
+	profileService := services.NewProfileServiceImpl(profileRepo, userService)
 
-func InitS3Service(client *s3.PresignClient) services.S3Service {
-	repo := repositories.NewS3RepositoryImpl(client)
-	return services.NewS3ServiceImpl(repo)
-}
+	s3Service := services.NewS3ServiceImpl(s3Repo)
 
-func InitGenAIService() services.GenAIService {
-	baseUrl := "http://localhost:5000"
-	genAIRepo := repositories.NewFlaskMicroservice(baseUrl)
-	return services.NewGenAIService(genAIRepo)
-}
+	genAIService := services.NewGenAIService(genAIRepo)
 
-func InitRoboPortfolioService(pr repositories.PortfolioRepo, pc cache.PortfolioCache, ps services.ProfileService, gs services.GenAIService) services.RoboPortfolioService {
-	return services.NewRoboPortfolioService(pr, pc, ps, gs)
-}
+	roboPortfolioService := services.NewRoboPortfolioService(
+		portfolioRepo, portfolioCache, profileService, genAIService,
+	)
 
-func InitManualPortfolioService(pr repositories.PortfolioRepo, pc cache.PortfolioCache, ps services.ProfileService) services.ManualPortfolioService {
-	return services.NewManualPortfolioService(pr, pc, ps)
+	manualPortfolioService := services.NewManualPortfolioService(
+		portfolioRepo, portfolioCache, profileService,
+	)
+
+	return userService, profileService, roboPortfolioService, manualPortfolioService, s3Service, genAIService
 }

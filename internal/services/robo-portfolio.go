@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/KZY20112001/infinivest-backend/internal/cache"
+	"github.com/KZY20112001/infinivest-backend/internal/caches"
 	"github.com/KZY20112001/infinivest-backend/internal/commons"
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
@@ -22,12 +22,12 @@ type RoboPortfolioService interface {
 
 type roboPortfolioServiceImpl struct {
 	repo           repositories.PortfolioRepo
-	cache          cache.PortfolioCache
+	cache          caches.PortfolioCache
 	profileService ProfileService
 	genAIService   GenAIService
 }
 
-func NewRoboPortfolioService(pr repositories.PortfolioRepo, pc cache.PortfolioCache, ps ProfileService, gs GenAIService) *roboPortfolioServiceImpl {
+func NewRoboPortfolioService(pr repositories.PortfolioRepo, pc caches.PortfolioCache, ps ProfileService, gs GenAIService) *roboPortfolioServiceImpl {
 	return &roboPortfolioServiceImpl{repo: pr, cache: pc, profileService: ps, genAIService: gs}
 }
 
