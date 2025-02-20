@@ -8,13 +8,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/KZY20112001/infinivest-backend/internal/cache"
 	"github.com/KZY20112001/infinivest-backend/internal/db"
-	"github.com/KZY20112001/infinivest-backend/internal/handlers"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
-	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 	"github.com/KZY20112001/infinivest-backend/internal/routes"
-	"github.com/KZY20112001/infinivest-backend/internal/services"
+	"github.com/KZY20112001/infinivest-backend/internal/setup"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/joho/godotenv"
@@ -45,52 +42,6 @@ func init() {
 	}
 }
 
-func initUserService(db *gorm.DB) services.UserService {
-	repo := repositories.NewPostgresUserRepo(db)
-	return services.NewUserServiceImpl(repo)
-}
-
-func initProfileService(db *gorm.DB, us services.UserService) services.ProfileService {
-	repo := repositories.NewPostgresProfileRepo(db)
-	return services.NewProfileServiceImpl(repo, us)
-}
-
-func initS3Service(client *s3.PresignClient) services.S3Service {
-	repo := repositories.NewS3RepositoryImpl(client)
-	return services.NewS3ServiceImpl(repo)
-}
-
-func initGenAIService() services.GenAIService {
-	baseUrl := "http://localhost:5000"
-	genAIRepo := repositories.NewFlaskMicroservice(baseUrl)
-	return services.NewGenAIService(genAIRepo)
-}
-
-func initRoboPortfolioService(pr repositories.PortfolioRepo, pc cache.PortfolioCache, ps services.ProfileService, gs services.GenAIService) services.RoboPortfolioService {
-	return services.NewRoboPortfolioService(pr, pc, ps, gs)
-}
-
-func initManualPortfolioService(pr repositories.PortfolioRepo) services.ManualPortfolioService {
-	return services.NewManualPortfolioService(pr)
-}
-
-func initHandlers(db *gorm.DB, redisClient *redis.Client, s3Client *s3.PresignClient) (*handlers.UserHandler, *handlers.ProfileHandler, *handlers.RoboPortfolioHandler, *handlers.ManualPortfolioHandler, *handlers.S3Handler) {
-	genAIService := initGenAIService()
-	s3Service := initS3Service(s3Client)
-	userService := initUserService(db)
-	profileService := initProfileService(db, userService)
-
-	portfolioRepo := repositories.NewPostgresPortfolioRepo(db)
-	portfolioCache := cache.NewPortfolioRedis(redisClient)
-	roboPortfolioService := initRoboPortfolioService(portfolioRepo, portfolioCache, profileService, genAIService)
-	manualPortfolioService := initManualPortfolioService(portfolioRepo)
-	return handlers.NewUserHandler(userService),
-		handlers.NewProfileHandler(profileService),
-		handlers.NewRoboPortfolioHandler(roboPortfolioService, genAIService),
-		handlers.NewManualPortfolioHandler(manualPortfolioService),
-		handlers.NewS3Handler(s3Service)
-}
-
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
@@ -100,7 +51,7 @@ func main() {
 	}
 	s3Client := s3.NewFromConfig(cfg)
 	presignClient := s3.NewPresignClient(s3Client)
-	userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, s3Handler := initHandlers(postgresDB, redisClient, presignClient)
+	userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, s3Handler := setup.InitHandlers(postgresDB, redisClient, presignClient)
 
 	r := routes.RegisterRoutes(userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, s3Handler)
 	srv := &http.Server{

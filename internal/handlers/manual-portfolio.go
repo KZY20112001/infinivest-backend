@@ -9,17 +9,17 @@ import (
 )
 
 type ManualPortfolioHandler struct {
-	portfolioService services.ManualPortfolioService
+	service services.ManualPortfolioService
 }
 
 func NewManualPortfolioHandler(ps services.ManualPortfolioService) *ManualPortfolioHandler {
-	return &ManualPortfolioHandler{portfolioService: ps}
+	return &ManualPortfolioHandler{service: ps}
 }
 
 // handlers for manual-portfolios
 func (h *ManualPortfolioHandler) GetManualPortfolios(c *gin.Context) {
 	userID := c.GetUint("id")
-	portfolios, err := h.portfolioService.GetManualPortfolios(userID)
+	portfolios, err := h.service.GetManualPortfolios(userID)
 	if err != nil {
 		commons.HandleError(c, err)
 		return

@@ -11,12 +11,12 @@ import (
 )
 
 type RoboPortfolioHandler struct {
-	portfolioService services.RoboPortfolioService
-	genAIService     services.GenAIService
+	service      services.RoboPortfolioService
+	genAIService services.GenAIService
 }
 
 func NewRoboPortfolioHandler(ps services.RoboPortfolioService, gs services.GenAIService) *RoboPortfolioHandler {
-	return &RoboPortfolioHandler{portfolioService: ps, genAIService: gs}
+	return &RoboPortfolioHandler{service: ps, genAIService: gs}
 }
 
 func (h *RoboPortfolioHandler) GenerateRoboAdvisorPortfolio(c *gin.Context) {
@@ -69,7 +69,7 @@ func (h *RoboPortfolioHandler) ConfirmGeneratedRoboPortfolio(c *gin.Context) {
 		return
 	}
 	userID := c.GetUint("id")
-	err := h.portfolioService.ConfirmGeneratedRoboPortfolio(req, userID)
+	err := h.service.ConfirmGeneratedRoboPortfolio(req, userID)
 	if err != nil {
 		commons.HandleError(c, err)
 		return
@@ -79,7 +79,7 @@ func (h *RoboPortfolioHandler) ConfirmGeneratedRoboPortfolio(c *gin.Context) {
 
 func (h *RoboPortfolioHandler) GetRoboPortfolio(c *gin.Context) {
 	userID := c.GetUint("id")
-	portfolio, err := h.portfolioService.GetRoboPortfolio(userID)
+	portfolio, err := h.service.GetRoboPortfolio(userID)
 	if err != nil {
 		commons.HandleError(c, err)
 		return
@@ -95,7 +95,7 @@ func (h *RoboPortfolioHandler) AddMoneyToRoboPortfolio(c *gin.Context) {
 	}
 
 	userID := c.GetUint("id")
-	portfolio, err := h.portfolioService.AddMoneyToRoboPortfolio(c.Request.Context(), userID, req.Amount)
+	portfolio, err := h.service.AddMoneyToRoboPortfolio(c.Request.Context(), userID, req.Amount)
 	if err != nil {
 		commons.HandleError(c, err)
 		return
@@ -114,7 +114,7 @@ func (h *RoboPortfolioHandler) UpdateRebalanceFreq(c *gin.Context) {
 		return
 	}
 	userID := c.GetUint("id")
-	err := h.portfolioService.UpdateRebalanceFreq(userID, req.Frequency)
+	err := h.service.UpdateRebalanceFreq(userID, req.Frequency)
 	if err != nil {
 		commons.HandleError(c, err)
 		return
