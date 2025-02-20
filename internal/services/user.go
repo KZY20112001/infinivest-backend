@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/KZY20112001/infinivest-backend/internal/constants"
+	"github.com/KZY20112001/infinivest-backend/internal/commons"
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
@@ -52,19 +52,19 @@ func (us *userServiceImpl) SignUp(dto dto.AuthRequest) (*dto.TokenResponse, erro
 func (us *userServiceImpl) SignIn(dto dto.AuthRequest) (*dto.TokenResponse, error) {
 	user, err := us.repo.GetUserByEmail(dto.Email)
 	if err != nil {
-		return nil, constants.ErrInvalidCredentials
+		return nil, commons.ErrInvalidCredentials
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(dto.Password))
 
 	if err != nil {
-		return nil, constants.ErrInvalidCredentials
+		return nil, commons.ErrInvalidCredentials
 	}
 	return us.generateTokens(user.ID)
 }
 
 func (us *userServiceImpl) RefreshRequest(dto dto.RefreshRequest) (*dto.TokenResponse, error) {
-	id, err := authenticateToken(dto.RefreshToken, constants.RefreshToken)
+	id, err := authenticateToken(dto.RefreshToken, commons.RefreshToken)
 
 	if err != nil {
 		return nil, err
@@ -86,12 +86,12 @@ func (us *userServiceImpl) GetUserByEmail(email string) (*models.User, error) {
 }
 
 func (us *userServiceImpl) generateTokens(id uint) (*dto.TokenResponse, error) {
-	accessToken, err := generateJWT(id, constants.AccessToken)
+	accessToken, err := generateJWT(id, commons.AccessToken)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := generateJWT(id, constants.RefreshToken)
+	refreshToken, err := generateJWT(id, commons.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -102,12 +102,12 @@ func (us *userServiceImpl) generateTokens(id uint) (*dto.TokenResponse, error) {
 	}, nil
 }
 
-func generateJWT(id uint, tokenType constants.TokenType) (string, error) {
+func generateJWT(id uint, tokenType commons.TokenType) (string, error) {
 	var t int64 = 0
 	switch tokenType {
-	case constants.AccessToken:
+	case commons.AccessToken:
 		t = time.Now().Add(2 * time.Hour).Unix()
-	case constants.RefreshToken:
+	case commons.RefreshToken:
 		t = time.Now().Add(8 * time.Hour).Unix()
 	default:
 		t = 0
@@ -121,7 +121,7 @@ func generateJWT(id uint, tokenType constants.TokenType) (string, error) {
 	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 }
 
-func authenticateToken(tokenString string, expectedType constants.TokenType) (uint, error) {
+func authenticateToken(tokenString string, expectedType commons.TokenType) (uint, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")

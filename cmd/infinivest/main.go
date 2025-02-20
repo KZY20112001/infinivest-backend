@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/KZY20112001/infinivest-backend/internal/cache"
 	"github.com/KZY20112001/infinivest-backend/internal/db"
 	"github.com/KZY20112001/infinivest-backend/internal/handlers"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
@@ -17,12 +18,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
 var (
-	postgresDB *gorm.DB
-	// redisClient *redis.Client
+	postgresDB  *gorm.DB
+	redisClient *redis.Client
 )
 
 func init() {
@@ -37,10 +39,10 @@ func init() {
 	}
 	postgresDB.AutoMigrate(&models.User{}, &models.Profile{}, &models.Portfolio{}, &models.PortfolioCategory{}, &models.PortfolioAsset{})
 
-	// redisClient, err = db.ConnectToRedis()
-	// if err != nil {
-	// 	log.Fatalf("error in connecting to redis: %w", err.Error())
-	// }
+	redisClient, err = db.ConnectToRedis()
+	if err != nil {
+		log.Fatalf("error in connecting to redis: %v", err.Error())
+	}
 }
 
 func initUserService(db *gorm.DB) services.UserService {
@@ -64,17 +66,18 @@ func initGenAIService() services.GenAIService {
 	return services.NewGenAIService(genAIRepo)
 }
 
-func initPortfolioService(db *gorm.DB, ps services.ProfileService, gs services.GenAIService) services.PortfolioService {
+func initPortfolioService(db *gorm.DB, redis *redis.Client, ps services.ProfileService, gs services.GenAIService) services.PortfolioService {
 	portfolioRepo := repositories.NewPostgresPortfolioRepo(db)
-	return services.NewPortfolioService(portfolioRepo, ps, gs)
+	portfolioCache := cache.NewPortfolioRedis(redis)
+	return services.NewPortfolioService(portfolioRepo, portfolioCache, ps, gs)
 }
 
-func initHandlers(db *gorm.DB, s3Client *s3.PresignClient) (*handlers.UserHandler, *handlers.ProfileHandler, *handlers.PortfolioHandler, *handlers.S3Handler) {
+func initHandlers(db *gorm.DB, redisClient *redis.Client, s3Client *s3.PresignClient) (*handlers.UserHandler, *handlers.ProfileHandler, *handlers.PortfolioHandler, *handlers.S3Handler) {
 	genAIService := initGenAIService()
 	s3Service := initS3Service(s3Client)
 	userService := initUserService(db)
 	profileService := initProfileService(db, userService)
-	portfolioService := initPortfolioService(db, profileService, genAIService)
+	portfolioService := initPortfolioService(db, redisClient, profileService, genAIService)
 	return handlers.NewUserHandler(userService),
 		handlers.NewProfileHandler(profileService),
 		handlers.NewPortfolioHandler(portfolioService, genAIService),
@@ -90,7 +93,7 @@ func main() {
 	}
 	s3Client := s3.NewFromConfig(cfg)
 	presignClient := s3.NewPresignClient(s3Client)
-	userHandler, profileHandler, portfolioHandler, s3Handler := initHandlers(postgresDB, presignClient)
+	userHandler, profileHandler, portfolioHandler, s3Handler := initHandlers(postgresDB, redisClient, presignClient)
 
 	r := routes.RegisterRoutes(userHandler, profileHandler, portfolioHandler, s3Handler)
 	srv := &http.Server{

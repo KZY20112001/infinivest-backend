@@ -39,7 +39,9 @@ func (s *genAIServiceImpl) GenerateAssetAllocations(req dto.AssetAllocationReque
 
 	var wg sync.WaitGroup
 	for category, percentage := range req.Portfolio {
-
+		if category == "cash" {
+			continue
+		}
 		wg.Add(1)
 		go s.generateAssetAllocation(category, percentage, &wg, resChan)
 	}

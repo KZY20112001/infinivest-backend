@@ -3,7 +3,7 @@ package repositories
 import (
 	"errors"
 
-	"github.com/KZY20112001/infinivest-backend/internal/constants"
+	"github.com/KZY20112001/infinivest-backend/internal/commons"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -24,7 +24,7 @@ func NewPostgresProfileRepo(db *gorm.DB) *postgresProfileRepo {
 
 func (r *postgresProfileRepo) CreateProfile(profile *models.Profile) error {
 	if profile == nil {
-		return constants.ErrNil
+		return commons.ErrNil
 	}
 	if err := r.db.Create(&profile).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {

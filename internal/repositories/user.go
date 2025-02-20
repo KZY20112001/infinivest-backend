@@ -3,7 +3,7 @@ package repositories
 import (
 	"errors"
 
-	"github.com/KZY20112001/infinivest-backend/internal/constants"
+	"github.com/KZY20112001/infinivest-backend/internal/commons"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
 
 	"gorm.io/gorm"
@@ -27,7 +27,7 @@ func NewPostgresUserRepo(db *gorm.DB) *postgresUserRepo {
 
 func (r *postgresUserRepo) SignUp(user *models.User) error {
 	if user == nil {
-		return constants.ErrNil
+		return commons.ErrNil
 	}
 
 	if err := r.db.Create(&user).Error; err != nil {

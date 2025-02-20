@@ -1,10 +1,13 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"sync"
 
+	"github.com/KZY20112001/infinivest-backend/internal/cache"
+	"github.com/KZY20112001/infinivest-backend/internal/commons"
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
@@ -13,7 +16,7 @@ import (
 type PortfolioService interface {
 	ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error
 	GetRoboPortfolio(userID uint) (*models.Portfolio, error)
-	AddMoneyToRoboPortfolio(userID uint, amount float64) (*models.Portfolio, error)
+	AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.Portfolio, error)
 	UpdateRebalanceFreq(userID uint, freq string) error
 
 	GetManualPortfolios(userID uint) ([]models.Portfolio, error)
@@ -21,12 +24,13 @@ type PortfolioService interface {
 
 type portfolioServiceImpl struct {
 	repo           repositories.PortfolioRepo
+	cache          cache.PortfolioCache
 	profileService ProfileService
 	genAIService   GenAIService
 }
 
-func NewPortfolioService(pr repositories.PortfolioRepo, ps ProfileService, gs GenAIService) *portfolioServiceImpl {
-	return &portfolioServiceImpl{repo: pr, profileService: ps, genAIService: gs}
+func NewPortfolioService(pr repositories.PortfolioRepo, pc cache.PortfolioCache, ps ProfileService, gs GenAIService) *portfolioServiceImpl {
+	return &portfolioServiceImpl{repo: pr, cache: pc, profileService: ps, genAIService: gs}
 }
 
 func (s *portfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error {
@@ -40,7 +44,7 @@ func (s *portfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.ConfirmPort
 		Name:          strconv.FormatUint(uint64(userID), 10) + " Robo Advisor Portfolio",
 		IsRoboAdvisor: true,
 		Category:      []*models.PortfolioCategory{},
-		RebalanceFreq: nil,
+		RebalanceFreq: &req.Frequency,
 	}
 
 	// manually append cash category (no assets)
@@ -84,12 +88,31 @@ func (s *portfolioServiceImpl) GetRoboPortfolio(userID uint) (*models.Portfolio,
 	return s.repo.GetRoboPortfolio(userID)
 }
 
-func (s *portfolioServiceImpl) AddMoneyToRoboPortfolio(userID uint, amount float64) (*models.Portfolio, error) {
+func (s *portfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.Portfolio, error) {
 	portfolio, err := s.repo.GetRoboPortfolio(userID)
 	if err != nil {
 		return nil, err
 	}
-	return s.addMoneyToPortfolio(portfolio, amount)
+
+	if err := s.addMoneyToPortfolio(portfolio, amount); err != nil {
+		return nil, err
+	}
+
+	// check if current portfolio is in queue
+	if _, err := s.cache.GetNextRebalanceTime(ctx, portfolio.ID, userID); err == nil {
+		return portfolio, nil
+	}
+
+	// add portfolio to rebalancing queue
+	nextRebalanceTime, err := commons.GetNextRebalanceTime(*portfolio.RebalanceFreq)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = s.cache.AddPortfolioToRebalancingQueue(ctx, portfolio.ID, userID, nextRebalanceTime); err != nil {
+		return nil, err
+	}
+	return portfolio, err
 }
 
 func (s *portfolioServiceImpl) UpdateRebalanceFreq(userID uint, freq string) error {
@@ -101,7 +124,7 @@ func (s *portfolioServiceImpl) GetManualPortfolios(userID uint) ([]models.Portfo
 }
 
 // utility functions
-func (s *portfolioServiceImpl) addMoneyToPortfolio(portfolio *models.Portfolio, amount float64) (*models.Portfolio, error) {
+func (s *portfolioServiceImpl) addMoneyToPortfolio(portfolio *models.Portfolio, amount float64) error {
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(portfolio.Category))
 	for _, category := range portfolio.Category {
@@ -119,14 +142,14 @@ func (s *portfolioServiceImpl) addMoneyToPortfolio(portfolio *models.Portfolio, 
 	close(errCh)
 
 	for err := range errCh {
-		return nil, err
+		return err
 	}
 
 	// save the updated portfolio
 	if err := s.repo.UpdatePortfolio(portfolio); err != nil {
-		return nil, err
+		return err
 	}
-	return portfolio, nil
+	return nil
 }
 
 func (s *portfolioServiceImpl) updateAsset(asset *models.PortfolioAsset, assetAmount float64, wg *sync.WaitGroup, errCh chan<- error) {

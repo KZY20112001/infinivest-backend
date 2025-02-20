@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/KZY20112001/infinivest-backend/internal/commons"
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
 	"github.com/KZY20112001/infinivest-backend/internal/services"
 	"github.com/gin-gonic/gin"
@@ -25,7 +26,7 @@ func (h *UserHandler) SignUp(c *gin.Context) {
 
 	tokens, err := h.userService.SignUp(req)
 	if err != nil {
-		HandleError(c, err)
+		commons.HandleError(c, err)
 		return
 	}
 
@@ -42,7 +43,7 @@ func (h *UserHandler) SignIn(c *gin.Context) {
 
 	tokens, err := h.userService.SignIn(req)
 	if err != nil {
-		HandleError(c, err)
+		commons.HandleError(c, err)
 		return
 	}
 
@@ -57,7 +58,7 @@ func (h *UserHandler) RefreshToken(c *gin.Context) {
 	}
 	tokens, err := h.userService.RefreshRequest(req)
 	if err != nil {
-		HandleError(c, err)
+		commons.HandleError(c, err)
 		return
 	}
 
@@ -68,7 +69,7 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 	id := c.GetUint("id")
 	user, err := h.userService.GetUser(id)
 	if err != nil {
-		HandleError(c, err)
+		commons.HandleError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"user": user})

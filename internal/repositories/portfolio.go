@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/KZY20112001/infinivest-backend/internal/constants"
+	"github.com/KZY20112001/infinivest-backend/internal/commons"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -27,7 +27,7 @@ func NewPostgresPortfolioRepo(db *gorm.DB) *postgresPortfolioRepo {
 
 func (r *postgresPortfolioRepo) CreatePortfolio(portfolio *models.Portfolio) error {
 	if portfolio == nil {
-		return constants.ErrNil
+		return commons.ErrNil
 	}
 	if err := r.db.Create(&portfolio).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
