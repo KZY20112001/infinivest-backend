@@ -10,6 +10,7 @@ import (
 )
 
 type PortfolioRepo interface {
+	GetPortfolio(portfolioID, userID uint) (*models.Portfolio, error)
 	CreatePortfolio(portfolio *models.Portfolio) error
 	GetRoboPortfolio(userID uint) (*models.Portfolio, error)
 	UpdateRebalanceFreq(userID uint, freq string) error
@@ -23,6 +24,21 @@ type postgresPortfolioRepo struct {
 
 func NewPostgresPortfolioRepo(db *gorm.DB) *postgresPortfolioRepo {
 	return &postgresPortfolioRepo{db: db}
+}
+
+func (r *postgresPortfolioRepo) GetPortfolio(portfolioID, userID uint) (*models.Portfolio, error) {
+	var portfolio models.Portfolio
+	if err := r.db.
+		Where("id = ? AND user_id = ?", portfolioID, userID).
+		Preload("Category").
+		Preload("Category.Assets").
+		First(&portfolio).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, gorm.ErrRecordNotFound
+		}
+		return nil, err
+	}
+	return &portfolio, nil
 }
 
 func (r *postgresPortfolioRepo) CreatePortfolio(portfolio *models.Portfolio) error {

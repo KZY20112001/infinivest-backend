@@ -6,14 +6,14 @@ import (
 )
 
 var (
-	ValidFrequencies = map[string]struct{}{
-		"daily":      {},
-		"monthly":    {},
-		"biweekly":   {},
-		"weekly":     {},
-		"quarterly":  {},
-		"biannually": {},
-		"annually":   {},
+	RebalancingThresholds = map[string]float64{
+		"daily":      10.0, // ±10%
+		"weekly":     7.0,  // ±7%
+		"biweekly":   5.0,  // ±5%
+		"monthly":    3.0,  // ±3%
+		"quarterly":  2.0,  // ±2%
+		"biannually": 1.0,  // ±1%
+		"annually":   0.5,  // ±0.5%
 	}
 )
 

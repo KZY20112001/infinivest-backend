@@ -43,7 +43,20 @@ func (s *genAIServiceImpl) GenerateAssetAllocations(req dto.AssetAllocationReque
 			continue
 		}
 		wg.Add(1)
-		go s.generateAssetAllocation(category, percentage, &wg, resChan)
+		go func(category string, percentage float64) {
+			defer wg.Done()
+			if percentage == 0 {
+				resChan <- CategoryResult{Category: category, Assets: dto.Assets{Assets: []dto.Asset{}}}
+				return
+			}
+			assets, err := s.repo.GenerateAssetAllocation(category, percentage)
+			if err != nil {
+				resChan <- CategoryResult{Category: category, Error: err}
+			} else {
+				resChan <- CategoryResult{Category: category, Assets: assets}
+			}
+
+		}(category, percentage)
 	}
 
 	wg.Wait()
@@ -66,18 +79,4 @@ func (s *genAIServiceImpl) GenerateAssetAllocations(req dto.AssetAllocationReque
 
 func (s *genAIServiceImpl) GetLatestAssetPrice(symbol string) (float64, error) {
 	return s.repo.GetLatestAssetPrice(symbol)
-}
-
-func (s *genAIServiceImpl) generateAssetAllocation(category string, percentage float64, wg *sync.WaitGroup, resChan chan<- CategoryResult) {
-	defer wg.Done()
-	if percentage == 0 {
-		resChan <- CategoryResult{Category: category, Assets: dto.Assets{Assets: []dto.Asset{}}}
-		return
-	}
-	assets, err := s.repo.GenerateAssetAllocation(category, percentage)
-	if err != nil {
-		resChan <- CategoryResult{Category: category, Error: err}
-	} else {
-		resChan <- CategoryResult{Category: category, Assets: assets}
-	}
 }

@@ -79,7 +79,7 @@ func main() {
 		roboPortfolioService, portfolioRepo, portfolioCache,
 	)
 
-	portfolioScheduler.Start()
+	portfolioScheduler.Start(ctx)
 	r := routes.RegisterRoutes(userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, s3Handler)
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -96,6 +96,7 @@ func main() {
 
 	// Listen for the interrupt signal.
 	<-ctx.Done()
+	stop()
 	// Restore default behavior on the interrupt signal and notify user of shutdown.
 	log.Println("shutting down gracefully, press Ctrl+C again to force")
 

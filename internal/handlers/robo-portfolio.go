@@ -64,7 +64,7 @@ func (h *RoboPortfolioHandler) ConfirmGeneratedRoboPortfolio(c *gin.Context) {
 		return
 	}
 
-	if _, exists := commons.ValidFrequencies[req.Frequency]; !exists {
+	if _, exists := commons.RebalancingThresholds[req.Frequency]; !exists {
 		commons.HandleError(c, fmt.Errorf("invalid rebalance frequency"))
 		return
 	}
@@ -109,7 +109,7 @@ func (h *RoboPortfolioHandler) UpdateRebalanceFreq(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if _, exists := commons.ValidFrequencies[req.Frequency]; !exists {
+	if _, exists := commons.RebalancingThresholds[req.Frequency]; !exists {
 		commons.HandleError(c, fmt.Errorf("invalid rebalance frequency"))
 		return
 	}
