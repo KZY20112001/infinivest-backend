@@ -114,7 +114,7 @@ func (h *RoboPortfolioHandler) UpdateRebalanceFreq(c *gin.Context) {
 		return
 	}
 	userID := c.GetUint("id")
-	err := h.service.UpdateRebalanceFreq(userID, req.Frequency)
+	err := h.service.UpdateRebalanceFreq(c.Request.Context(), userID, req.Frequency)
 	if err != nil {
 		commons.HandleError(c, err)
 		return

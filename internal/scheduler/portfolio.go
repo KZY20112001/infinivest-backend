@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/KZY20112001/infinivest-backend/internal/caches"
+	"github.com/KZY20112001/infinivest-backend/internal/commons"
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 	"github.com/KZY20112001/infinivest-backend/internal/services"
 )
@@ -25,7 +26,7 @@ type portfolioSchedulerImpl struct {
 
 func NewPortfolioSchedulerImpl(s services.RoboPortfolioService, r repositories.PortfolioRepo, c caches.PortfolioCache) *portfolioSchedulerImpl {
 	return &portfolioSchedulerImpl{
-		ticker:  time.NewTicker(1 * time.Minute),
+		ticker:  time.NewTicker(12 * time.Hour),
 		service: s,
 		repo:    r,
 		cache:   c,
@@ -33,6 +34,8 @@ func NewPortfolioSchedulerImpl(s services.RoboPortfolioService, r repositories.P
 }
 
 func (s *portfolioSchedulerImpl) Start(ctx context.Context) {
+	log.Println("Rebalancing portfolios at the start")
+	s.rebalancePortfolios(ctx)
 	go func() {
 		for {
 			select {
@@ -66,6 +69,7 @@ func (s *portfolioSchedulerImpl) rebalancePortfolios(ctx context.Context) {
 
 	const maxWorkers = 100
 	workerPool := make(chan struct{}, maxWorkers)
+	errChan := make(chan error, len(portfolioIDs))
 	var wg sync.WaitGroup
 
 	for _, portfolio := range portfolioIDs {
@@ -92,8 +96,36 @@ func (s *portfolioSchedulerImpl) rebalancePortfolios(ctx context.Context) {
 				}
 			}()
 
-			s.service.RebalancePortfolio(userID, portfolioID)
+			portfolio, err := s.service.RebalancePortfolio(userID, portfolioID)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to rebalance portfolio %d:%d: %w", userID, portfolioID, err)
+				return
+			}
+
+			// delete current portfolio from queue and queue for the next rebalance time
+			if err := s.cache.DeletePortfolioFromQueue(ctx, userID, portfolioID); err != nil {
+				errChan <- fmt.Errorf("failed to remove portfolio %d:%d from rebalancing queue: %w", userID, portfolioID, err)
+				return
+			}
+			// add the new balance time
+			nextRebalanceTime, err := commons.GetNextRebalanceTime(*portfolio.RebalanceFreq)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to get next rebalance time for portfolio %d:%d: %w", userID, portfolioID, err)
+				return
+			}
+
+			if err = s.cache.AddPortfolioToRebalancingQueue(ctx, userID, portfolio.ID, nextRebalanceTime); err != nil {
+				errChan <- fmt.Errorf("failed to add portfolio %d:%d to rebalancing queue: %w", userID, portfolioID, err)
+				return
+			}
 		}(userID, portfolioID)
 
 	}
+	wg.Wait()
+	close(errChan)
+	for err := range errChan {
+		log.Println(err)
+	}
+	log.Println("Rebalancing complete")
+
 }

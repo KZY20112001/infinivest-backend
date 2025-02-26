@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"sync"
@@ -18,8 +19,9 @@ type RoboPortfolioService interface {
 	ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error
 	GetRoboPortfolio(userID uint) (*models.Portfolio, error)
 	AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.Portfolio, error)
-	UpdateRebalanceFreq(userID uint, freq string) error
-	RebalancePortfolio(portfolioID, userID uint) error
+	WithDrawMoneyFromRoboPortfolio(ctx context.Context, userID uint, amount float64) (float64, error)
+	UpdateRebalanceFreq(ctx context.Context, userID uint, freq string) error
+	RebalancePortfolio(userID, portfolioID uint) (*models.Portfolio, error)
 }
 
 type roboPortfolioServiceImpl struct {
@@ -99,7 +101,7 @@ func (s *roboPortfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, 
 	}
 
 	// check if current portfolio is in queue
-	if _, err := s.cache.GetNextRebalanceTime(ctx, portfolio.ID, userID); err == nil {
+	if _, err := s.cache.GetNextRebalanceTime(ctx, userID, portfolio.ID); err == nil {
 		return portfolio, nil
 	}
 
@@ -109,25 +111,115 @@ func (s *roboPortfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, 
 		return nil, err
 	}
 
-	if err = s.cache.AddPortfolioToRebalancingQueue(ctx, portfolio.ID, userID, nextRebalanceTime); err != nil {
+	if err = s.cache.AddPortfolioToRebalancingQueue(ctx, userID, portfolio.ID, nextRebalanceTime); err != nil {
 		return nil, err
 	}
 	return portfolio, err
 }
 
-func (s *roboPortfolioServiceImpl) UpdateRebalanceFreq(userID uint, freq string) error {
-	return s.repo.UpdateRebalanceFreq(userID, freq)
+func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Context, userID uint, amount float64) (float64, error) {
+	portfolio, err := s.repo.GetRoboPortfolio(userID)
+	if err != nil {
+		return 0, err
+	}
+	var cashCategory *models.PortfolioCategory
+	for _, category := range portfolio.Category {
+		if category.Name == "cash" {
+			cashCategory = category
+			break
+		}
+	}
+	if amount <= cashCategory.TotalAmount {
+		cashCategory.TotalAmount -= amount
+		if _, err := s.repo.UpdatePortfolio(portfolio); err != nil {
+			return 0, err
+		}
+		return 0, nil
+	}
+	// sell assets to cover the remaining amount
+	cashCategory.TotalAmount = 0
+	amount -= cashCategory.TotalAmount
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	for _, category := range portfolio.Category {
+		if category.Name == "cash" || category.TotalPercentage == 0 {
+			continue
+		}
+
+		errChan := make(chan error, len(category.Assets))
+		for _, asset := range category.Assets {
+			wg.Add(1)
+			go func(asset *models.PortfolioAsset) {
+				defer wg.Done()
+				latestPrice, err := s.genAIService.GetLatestAssetPrice(asset.Symbol)
+				if err != nil {
+					errChan <- fmt.Errorf("failed to get latest price for asset %s: %w", asset.Symbol, err)
+					return
+				}
+				mu.Lock()
+				amountToSell := amount * asset.Percentage / 100
+				numOfShares := amountToSell / latestPrice
+				if numOfShares > asset.SharesOwned {
+					numOfShares = asset.SharesOwned
+				}
+				curAmount := numOfShares * latestPrice
+				category.TotalAmount -= amount
+				amount -= curAmount
+				mu.Unlock()
+				asset.SharesOwned -= numOfShares
+				asset.TotalInvested -= curAmount
+				asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
+
+			}(asset)
+		}
+		wg.Wait()
+		close(errChan)
+		for err := range errChan {
+			log.Println(err)
+		}
+	}
+
+	if _, err := s.repo.UpdatePortfolio(portfolio); err != nil {
+		return 0, err
+	}
+	return amount, nil
+}
+
+func (s *roboPortfolioServiceImpl) UpdateRebalanceFreq(ctx context.Context, userID uint, freq string) error {
+	portfolio, err := s.repo.GetRoboPortfolio(userID)
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.RebalancePortfolio(userID, portfolio.ID); err != nil {
+		return err
+	}
+
+	if err := s.cache.DeletePortfolioFromQueue(ctx, userID, portfolio.ID); err != nil {
+		return err
+	}
+
+	if err := s.repo.UpdateRebalanceFreq(userID, freq); err != nil {
+		return err
+	}
+
+	nextRebalanceTime, err := commons.GetNextRebalanceTime(freq)
+	if err != nil {
+		return err
+	}
+	return s.cache.AddPortfolioToRebalancingQueue(ctx, userID, portfolio.ID, nextRebalanceTime)
 }
 
 func (s *roboPortfolioServiceImpl) addMoneyToPortfolio(portfolio *models.Portfolio, amount float64) error {
 	var wg sync.WaitGroup
-	errCh := make(chan error, len(portfolio.Category))
 	for _, category := range portfolio.Category {
 		categoryTotal := amount * category.TotalPercentage / 100
 		category.TotalAmount += categoryTotal
 		if category.Name == "cash" || category.TotalPercentage == 0 {
 			continue
 		}
+		errCh := make(chan error, len(category.Assets))
 		for _, asset := range category.Assets {
 			wg.Add(1)
 			go func(asset *models.PortfolioAsset, assetAmount float64) {
@@ -146,37 +238,36 @@ func (s *roboPortfolioServiceImpl) addMoneyToPortfolio(portfolio *models.Portfol
 				}
 			}(asset, amount*asset.Percentage/100)
 		}
-	}
-	wg.Wait()
-	close(errCh)
-
-	for err := range errCh {
-		return err
+		wg.Wait()
+		close(errCh)
+		for err := range errCh {
+			return err
+		}
 	}
 
 	// save the updated portfolio
-	if err := s.repo.UpdatePortfolio(portfolio); err != nil {
+	if _, err := s.repo.UpdatePortfolio(portfolio); err != nil {
 		return err
 	}
 	return nil
 }
-func (s *roboPortfolioServiceImpl) RebalancePortfolio(portfolioID, userID uint) error {
-	fmt.Println("Rebalancing portfolio", portfolioID, "for user", userID)
-	portfolio, err := s.repo.GetPortfolio(portfolioID, userID)
+
+func (s *roboPortfolioServiceImpl) RebalancePortfolio(userID, portfolioID uint) (*models.Portfolio, error) {
+	log.Println("Rebalancing portfolio", portfolioID, "for user", userID)
+	portfolio, err := s.repo.GetPortfolio(userID, portfolioID)
 	if err != nil {
-		return fmt.Errorf("portfolio %d for user %d returns error: %w", portfolioID, userID, err)
+		return &models.Portfolio{}, fmt.Errorf("portfolio %d for user %d returns error: %w", userID, portfolioID, err)
 	}
 
 	threshold, exists := commons.RebalancingThresholds[*portfolio.RebalanceFreq]
 	if !exists {
-		return fmt.Errorf("invalid rebalance frequency: %s", *portfolio.RebalanceFreq)
+		return &models.Portfolio{}, fmt.Errorf("invalid rebalance frequency: %s", *portfolio.RebalanceFreq)
 	}
 	//get total portfolio value
 	latestAssetPricess := make(map[string]float64)
-
 	totalValue, err := s.getPortfolioValue(portfolio, latestAssetPricess)
 	if err != nil {
-		return fmt.Errorf("failed to get portfolio category values: %w", err)
+		return &models.Portfolio{}, fmt.Errorf("failed to get portfolio category values: %w", err)
 	}
 
 	overPerformingAssets := []*models.PortfolioAsset{}
@@ -204,34 +295,31 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(portfolioID, userID uint) 
 	}
 	totalCash := &cashCategory.TotalAmount
 
-	// correct over-allocated assets by selling shares
 	if err := s.sellOverPerformingAssets(overPerformingAssets, latestAssetPricess, totalValue, totalCash); err != nil {
-		return err
+		return &models.Portfolio{}, err
 	}
-
-	// correct under-allocated assets by buying shares
 	if err := s.buyUnderPerformingAssets(underPerformingAssets, latestAssetPricess, totalValue, totalCash); err != nil {
-		return err
+		return &models.Portfolio{}, err
 	}
-
 	// balance the cash
 	targetCash := totalValue * cashCategory.TotalPercentage / 100
 
 	if *totalCash < targetCash {
-		// not enouggh cash, send a notification to the user
-		fmt.Printf("Warning: Cash is under-allocated. Expected: %.2f, Available: %.2f\n", targetCash, *totalCash)
+		// not enough cash, send a notification to the user
+		log.Printf("Warning: Cash is under-allocated. Expected: %.2f, Available: %.2f\n", targetCash, *totalCash)
+		// TODO: email notification service
+
 		cashCategory.TotalAmount = *totalCash
 	} else if *totalCash > targetCash {
 		// too much cash: add the extra back into the portfolio
 		excessCash := *totalCash - targetCash
-		fmt.Printf("Excess cash detected: %.2f. Redistributing...\n", excessCash)
+		log.Printf("Excess cash detected: %.2f. Redistributing...\n", excessCash)
 		if err := s.addMoneyToPortfolio(portfolio, excessCash); err != nil {
-			return err
+			return &models.Portfolio{}, err
 		}
 		*totalCash = targetCash
 	}
-
-	return nil
+	return s.repo.UpdatePortfolio(portfolio)
 }
 
 func (s *roboPortfolioServiceImpl) getPortfolioValue(portfolio *models.Portfolio, latestAssetPricess map[string]float64) (float64, error) {
@@ -252,7 +340,6 @@ func (s *roboPortfolioServiceImpl) getPortfolioValue(portfolio *models.Portfolio
 				defer wg.Done()
 
 				latestPrice, err := s.genAIService.GetLatestAssetPrice(asset.Symbol)
-
 				if err != nil {
 					errCh <- fmt.Errorf("failed to get latest price for asset %s: %w", asset.Symbol, err)
 					return
