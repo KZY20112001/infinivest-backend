@@ -9,11 +9,10 @@ type Portfolio struct {
 	IsRoboAdvisor bool
 	Category      []*PortfolioCategory
 	RebalanceFreq *string
-	TotalInvested float64
 }
 
 type PortfolioCategory struct {
-	ID              uint `gorm:"primaryKey"`
+	gorm.Model
 	PortfolioID     uint `gorm:"not null"`
 	PortfolioUserID uint `gorm:"not null"`
 	Name            string
@@ -23,10 +22,11 @@ type PortfolioCategory struct {
 }
 
 type PortfolioAsset struct {
-	ID                  uint `gorm:"primaryKey"`
-	PortfolioCategoryID uint `gorm:"not null"`
-	Symbol              string
-	Percentage          float64
+	gorm.Model
+	PortfolioCategoryID uint
+
+	Symbol     string
+	Percentage float64
 
 	SharesOwned   float64
 	TotalInvested float64

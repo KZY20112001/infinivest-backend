@@ -87,6 +87,16 @@ func (h *RoboPortfolioHandler) GetRoboPortfolio(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"portfolio": portfolio})
 }
 
+func (h *RoboPortfolioHandler) DeleteRoboPortfolio(c *gin.Context) {
+	userID := c.GetUint("id")
+	err := h.service.DeleteRoboPortfolio(userID)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully deleted the portfolio"})
+}
+
 func (h *RoboPortfolioHandler) AddMoneyToRoboPortfolio(c *gin.Context) {
 	var req dto.AddMoneyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -101,6 +111,21 @@ func (h *RoboPortfolioHandler) AddMoneyToRoboPortfolio(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"portfolio": portfolio})
+}
+
+func (h *RoboPortfolioHandler) WithDrawMoneyFromRoboPortfolio(c *gin.Context) {
+	var req dto.WithdrawMoneyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	userID := c.GetUint("id")
+	amountWithdrawn, err := h.service.WithDrawMoneyFromRoboPortfolio(c.Request.Context(), userID, req.Amount)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"amount": amountWithdrawn})
 }
 
 func (h *RoboPortfolioHandler) UpdateRebalanceFreq(c *gin.Context) {

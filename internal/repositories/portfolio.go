@@ -10,9 +10,10 @@ import (
 )
 
 type PortfolioRepo interface {
-	GetPortfolio(portfolioID, userID uint) (*models.Portfolio, error)
+	GetPortfolio(userID, portfolioID uint) (*models.Portfolio, error)
 	CreatePortfolio(portfolio *models.Portfolio) error
 	GetRoboPortfolio(userID uint) (*models.Portfolio, error)
+	DeleteRoboPortfolio(userID uint) error
 	UpdateRebalanceFreq(userID uint, freq string) error
 	GetManualPortfolios(userID uint) ([]models.Portfolio, error)
 	UpdatePortfolio(portfolio *models.Portfolio) (*models.Portfolio, error)
@@ -26,7 +27,7 @@ func NewPostgresPortfolioRepo(db *gorm.DB) *postgresPortfolioRepo {
 	return &postgresPortfolioRepo{db: db}
 }
 
-func (r *postgresPortfolioRepo) GetPortfolio(portfolioID, userID uint) (*models.Portfolio, error) {
+func (r *postgresPortfolioRepo) GetPortfolio(userID, portfolioID uint) (*models.Portfolio, error) {
 	var portfolio models.Portfolio
 	if err := r.db.
 		Where("id = ? AND user_id = ?", portfolioID, userID).
@@ -74,6 +75,49 @@ func (r *postgresPortfolioRepo) GetRoboPortfolio(userID uint) (*models.Portfolio
 	}
 
 	return &portfolio, nil
+}
+
+func (r *postgresPortfolioRepo) DeleteRoboPortfolio(userID uint) error {
+	portfolio, err := r.GetRoboPortfolio(userID)
+	if err != nil {
+		return err
+	}
+
+	tx := r.db.Begin()
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	for _, category := range portfolio.Category {
+		for _, asset := range category.Assets {
+			if err := tx.Delete(&asset).Error; err != nil {
+				tx.Rollback()
+				return fmt.Errorf("failed to delete asset %s: %w", asset.Symbol, err)
+			}
+		}
+	}
+
+	for _, category := range portfolio.Category {
+		if err := tx.Delete(&category).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to delete category %s: %w", category.Name, err)
+		}
+	}
+
+	if err := tx.Delete(&portfolio).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete portfolio: %w", err)
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }
 
 func (r *postgresPortfolioRepo) GetManualPortfolios(userID uint) ([]models.Portfolio, error) {

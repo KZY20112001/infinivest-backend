@@ -18,6 +18,7 @@ import (
 type RoboPortfolioService interface {
 	ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error
 	GetRoboPortfolio(userID uint) (*models.Portfolio, error)
+	DeleteRoboPortfolio(userID uint) error
 	AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.Portfolio, error)
 	WithDrawMoneyFromRoboPortfolio(ctx context.Context, userID uint, amount float64) (float64, error)
 	UpdateRebalanceFreq(ctx context.Context, userID uint, freq string) error
@@ -51,7 +52,6 @@ func (s *roboPortfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.Confirm
 
 	// manually append cash category (no assets)
 	cashCategory := &models.PortfolioCategory{
-		PortfolioUserID: userID,
 		PortfolioID:     portfolio.ID,
 		Name:            "cash",
 		TotalPercentage: req.Portfolio["cash"],
@@ -62,7 +62,6 @@ func (s *roboPortfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.Confirm
 
 	for categoryName, assets := range req.Allocations {
 		category := &models.PortfolioCategory{
-			PortfolioUserID: userID,
 			PortfolioID:     portfolio.ID,
 			Name:            categoryName,
 			TotalPercentage: req.Portfolio[categoryName],
@@ -88,6 +87,10 @@ func (s *roboPortfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.Confirm
 
 func (s *roboPortfolioServiceImpl) GetRoboPortfolio(userID uint) (*models.Portfolio, error) {
 	return s.repo.GetRoboPortfolio(userID)
+}
+
+func (s *roboPortfolioServiceImpl) DeleteRoboPortfolio(userID uint) error {
+	return s.repo.DeleteRoboPortfolio(userID)
 }
 
 func (s *roboPortfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.Portfolio, error) {
@@ -123,6 +126,7 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 		return 0, err
 	}
 	var cashCategory *models.PortfolioCategory
+
 	for _, category := range portfolio.Category {
 		if category.Name == "cash" {
 			cashCategory = category
@@ -134,12 +138,12 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 		if _, err := s.repo.UpdatePortfolio(portfolio); err != nil {
 			return 0, err
 		}
-		return 0, nil
+		return amount, nil
 	}
 	// sell assets to cover the remaining amount
-	cashCategory.TotalAmount = 0
+	originalAmount := amount
 	amount -= cashCategory.TotalAmount
-
+	cashCategory.TotalAmount = 0
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	for _, category := range portfolio.Category {
@@ -157,20 +161,27 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 					errChan <- fmt.Errorf("failed to get latest price for asset %s: %w", asset.Symbol, err)
 					return
 				}
-				mu.Lock()
-				amountToSell := amount * asset.Percentage / 100
+				amountToSell := originalAmount * asset.Percentage / 100
 				numOfShares := amountToSell / latestPrice
 				if numOfShares > asset.SharesOwned {
 					numOfShares = asset.SharesOwned
 				}
 				curAmount := numOfShares * latestPrice
-				category.TotalAmount -= amount
+				mu.Lock()
+				category.TotalAmount -= curAmount
+				if category.TotalAmount < 0 {
+					category.TotalAmount = 0
+				}
 				amount -= curAmount
 				mu.Unlock()
 				asset.SharesOwned -= numOfShares
 				asset.TotalInvested -= curAmount
-				asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
-
+				if asset.TotalInvested < 0 {
+					asset.TotalInvested = 0
+				}
+				if asset.SharesOwned > 0 {
+					asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
+				}
 			}(asset)
 		}
 		wg.Wait()
@@ -183,7 +194,7 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 	if _, err := s.repo.UpdatePortfolio(portfolio); err != nil {
 		return 0, err
 	}
-	return amount, nil
+	return originalAmount - amount, nil
 }
 
 func (s *roboPortfolioServiceImpl) UpdateRebalanceFreq(ctx context.Context, userID uint, freq string) error {
@@ -391,7 +402,12 @@ func (s *roboPortfolioServiceImpl) sellOverPerformingAssets(portfolioCategories 
 			sharesToSell := amountToSell / latestPrice
 			asset.SharesOwned -= sharesToSell
 			asset.TotalInvested -= amountToSell
-			asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
+			if asset.TotalInvested < 0 {
+				asset.TotalInvested = 0
+			}
+			if asset.SharesOwned > 0 {
+				asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
+			}
 		}(asset)
 	}
 	wg.Wait()
@@ -435,8 +451,9 @@ func (s *roboPortfolioServiceImpl) buyUnderPerformingAssets(portfolioCategories 
 			sharesToBuy := amountToBuy / latestPrice
 			asset.SharesOwned += sharesToBuy
 			asset.TotalInvested += amountToBuy
-			asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
-
+			if asset.SharesOwned > 0 {
+				asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
+			}
 		}(asset)
 	}
 

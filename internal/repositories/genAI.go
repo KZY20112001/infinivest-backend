@@ -25,7 +25,7 @@ type flaskMicroservice struct {
 
 func NewFlaskMicroservice(baseURL string) *flaskMicroservice {
 	return &flaskMicroservice{
-		client:  &http.Client{Timeout: 30 * time.Second},
+		client:  &http.Client{Timeout: 60 * time.Second},
 		baseURL: baseURL,
 	}
 }
@@ -71,7 +71,7 @@ func (r *flaskMicroservice) GeneratePortfolioRecommendation(bankStatement *multi
 	}
 
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-
+	fmt.Println("Sending req to ", url)
 	resp, err := r.client.Do(req)
 	if err != nil {
 		return dto.RoboAdvisorRecommendationResponse{}, fmt.Errorf("failed to send request: %w", err)

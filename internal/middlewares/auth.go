@@ -11,7 +11,6 @@ import (
 	"github.com/golang-jwt/jwt"
 )
 
-// AuthMiddleware is a middleware function to validate JWTs
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
