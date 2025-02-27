@@ -11,7 +11,4 @@ type Profile struct {
 	Address    string
 	ProfileUrl string
 	ProfileID  string
-	// RoboAdvisorPortfolio   *Portfolio
-	// RoboAdvisorPortfolioID uint
-	// ManualPortfolio        []Portfolio
 }

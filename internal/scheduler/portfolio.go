@@ -20,11 +20,11 @@ type PortfolioScheduler interface {
 type portfolioSchedulerImpl struct {
 	ticker  *time.Ticker
 	service services.RoboPortfolioService
-	repo    repositories.PortfolioRepo
-	cache   caches.PortfolioCache
+	repo    repositories.RoboPortfolioRepo
+	cache   caches.RoboPortfolioCache
 }
 
-func NewPortfolioSchedulerImpl(s services.RoboPortfolioService, r repositories.PortfolioRepo, c caches.PortfolioCache) *portfolioSchedulerImpl {
+func NewPortfolioSchedulerImpl(s services.RoboPortfolioService, r repositories.RoboPortfolioRepo, c caches.RoboPortfolioCache) *portfolioSchedulerImpl {
 	return &portfolioSchedulerImpl{
 		ticker:  time.NewTicker(12 * time.Hour),
 		service: s,

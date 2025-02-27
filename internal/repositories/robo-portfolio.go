@@ -9,40 +9,24 @@ import (
 	"gorm.io/gorm"
 )
 
-type PortfolioRepo interface {
-	GetPortfolio(userID, portfolioID uint) (*models.Portfolio, error)
-	CreatePortfolio(portfolio *models.Portfolio) error
-	GetRoboPortfolio(userID uint) (*models.Portfolio, error)
+type RoboPortfolioRepo interface {
+	CreatePortfolio(portfolio *models.RoboPortfolio) error
+	GetRoboPortfolio(userID uint) (*models.RoboPortfolio, error)
 	DeleteRoboPortfolio(userID uint) error
 	UpdateRebalanceFreq(userID uint, freq string) error
-	GetManualPortfolios(userID uint) ([]models.Portfolio, error)
-	UpdatePortfolio(portfolio *models.Portfolio) (*models.Portfolio, error)
+	GetManualPortfolios(userID uint) ([]models.RoboPortfolio, error)
+	UpdatePortfolio(portfolio *models.RoboPortfolio) (*models.RoboPortfolio, error)
 }
 
-type postgresPortfolioRepo struct {
+type postgresRoboPortfolioRepo struct {
 	db *gorm.DB
 }
 
-func NewPostgresPortfolioRepo(db *gorm.DB) *postgresPortfolioRepo {
-	return &postgresPortfolioRepo{db: db}
+func NewPostgresRoboPortfolioRepo(db *gorm.DB) *postgresRoboPortfolioRepo {
+	return &postgresRoboPortfolioRepo{db: db}
 }
 
-func (r *postgresPortfolioRepo) GetPortfolio(userID, portfolioID uint) (*models.Portfolio, error) {
-	var portfolio models.Portfolio
-	if err := r.db.
-		Where("id = ? AND user_id = ?", portfolioID, userID).
-		Preload("Category").
-		Preload("Category.Assets").
-		First(&portfolio).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, gorm.ErrRecordNotFound
-		}
-		return nil, err
-	}
-	return &portfolio, nil
-}
-
-func (r *postgresPortfolioRepo) CreatePortfolio(portfolio *models.Portfolio) error {
+func (r *postgresRoboPortfolioRepo) CreatePortfolio(portfolio *models.RoboPortfolio) error {
 	if portfolio == nil {
 		return commons.ErrNil
 	}
@@ -56,10 +40,10 @@ func (r *postgresPortfolioRepo) CreatePortfolio(portfolio *models.Portfolio) err
 	return nil
 }
 
-func (r *postgresPortfolioRepo) GetRoboPortfolio(userID uint) (*models.Portfolio, error) {
-	var portfolio models.Portfolio
+func (r *postgresRoboPortfolioRepo) GetRoboPortfolio(userID uint) (*models.RoboPortfolio, error) {
+	var portfolio models.RoboPortfolio
 	if err := r.db.
-		Where("user_id = ? AND is_robo_advisor = ?", userID, true).
+		Where("user_id = ?", userID).
 		Preload("Category").
 		Preload("Category.Assets").
 		First(&portfolio).Error; err != nil {
@@ -77,7 +61,7 @@ func (r *postgresPortfolioRepo) GetRoboPortfolio(userID uint) (*models.Portfolio
 	return &portfolio, nil
 }
 
-func (r *postgresPortfolioRepo) DeleteRoboPortfolio(userID uint) error {
+func (r *postgresRoboPortfolioRepo) DeleteRoboPortfolio(userID uint) error {
 	portfolio, err := r.GetRoboPortfolio(userID)
 	if err != nil {
 		return err
@@ -120,8 +104,8 @@ func (r *postgresPortfolioRepo) DeleteRoboPortfolio(userID uint) error {
 	return nil
 }
 
-func (r *postgresPortfolioRepo) GetManualPortfolios(userID uint) ([]models.Portfolio, error) {
-	var portfolios []models.Portfolio
+func (r *postgresRoboPortfolioRepo) GetManualPortfolios(userID uint) ([]models.RoboPortfolio, error) {
+	var portfolios []models.RoboPortfolio
 	if err := r.db.
 		Where("user_id = ? AND is_robo_advisor = ?", userID, false).
 		Find(&portfolios).Error; err != nil {
@@ -130,7 +114,7 @@ func (r *postgresPortfolioRepo) GetManualPortfolios(userID uint) ([]models.Portf
 	return portfolios, nil
 }
 
-func (r *postgresPortfolioRepo) UpdatePortfolio(portfolio *models.Portfolio) (*models.Portfolio, error) {
+func (r *postgresRoboPortfolioRepo) UpdatePortfolio(portfolio *models.RoboPortfolio) (*models.RoboPortfolio, error) {
 	tx := r.db.Begin()
 
 	defer func() {
@@ -141,32 +125,32 @@ func (r *postgresPortfolioRepo) UpdatePortfolio(portfolio *models.Portfolio) (*m
 
 	if err := tx.Save(&portfolio).Error; err != nil {
 		tx.Rollback()
-		return &models.Portfolio{}, fmt.Errorf("failed to update portfolio: %w", err)
+		return &models.RoboPortfolio{}, fmt.Errorf("failed to update portfolio: %w", err)
 	}
 
 	for _, category := range portfolio.Category {
 		if err := tx.Save(&category).Error; err != nil {
 			tx.Rollback()
-			return &models.Portfolio{}, fmt.Errorf("failed to update category %s: %w", category.Name, err)
+			return &models.RoboPortfolio{}, fmt.Errorf("failed to update category %s: %w", category.Name, err)
 		}
 
 		for _, asset := range category.Assets {
 			if err := tx.Save(&asset).Error; err != nil {
 				tx.Rollback()
-				return &models.Portfolio{}, fmt.Errorf("failed to update asset %s: %w", asset.Symbol, err)
+				return &models.RoboPortfolio{}, fmt.Errorf("failed to update asset %s: %w", asset.Symbol, err)
 			}
 		}
 	}
 
 	if err := tx.Commit().Error; err != nil {
 		tx.Rollback()
-		return &models.Portfolio{}, fmt.Errorf("failed to commit transaction: %w", err)
+		return &models.RoboPortfolio{}, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return portfolio, nil
 }
 
-func (r *postgresPortfolioRepo) UpdateRebalanceFreq(userID uint, freq string) error {
+func (r *postgresRoboPortfolioRepo) UpdateRebalanceFreq(userID uint, freq string) error {
 	portfolio, err := r.GetRoboPortfolio(userID)
 	if err != nil {
 		return err

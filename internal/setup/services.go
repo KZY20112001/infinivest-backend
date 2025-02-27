@@ -7,10 +7,10 @@ import (
 )
 
 func Services(
-	portfolioCache caches.PortfolioCache,
+	portfolioCache caches.RoboPortfolioCache,
 	userRepo repositories.UserRepo,
 	profileRepo repositories.ProfileRepo,
-	portfolioRepo repositories.PortfolioRepo,
+	portfolioRepo repositories.RoboPortfolioRepo,
 	s3Repo repositories.S3Repository,
 	genAIRepo repositories.GenAIRepository,
 ) (

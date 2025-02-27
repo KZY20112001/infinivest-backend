@@ -9,8 +9,8 @@ import (
 
 func PortfolioScheduler(
 	roboPortfolioService services.RoboPortfolioService,
-	portfolioRepo repositories.PortfolioRepo,
-	portfolioCache caches.PortfolioCache) scheduler.PortfolioScheduler {
+	portfolioRepo repositories.RoboPortfolioRepo,
+	portfolioCache caches.RoboPortfolioCache) scheduler.PortfolioScheduler {
 	return scheduler.NewPortfolioSchedulerImpl(
 		roboPortfolioService,
 		portfolioRepo,

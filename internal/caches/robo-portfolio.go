@@ -8,7 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type PortfolioCache interface {
+type RoboPortfolioCache interface {
 	AddPortfolioToRebalancingQueue(ctx context.Context, userID, portfolioID uint, nextRebalance time.Time) error
 	GetNextRebalanceTime(ctx context.Context, userID, portfolioID uint) (time.Time, error)
 	DeletePortfolioFromQueue(ctx context.Context, userID, portfolioID uint) error
@@ -19,15 +19,15 @@ type PortfolioCache interface {
 	ReleaseLock(ctx context.Context, userID, portfolioID uint) error
 }
 
-type portfolioRedis struct {
+type roboPortfolioRedis struct {
 	client *redis.Client
 }
 
-func NewPortfolioRedis(client *redis.Client) *portfolioRedis {
-	return &portfolioRedis{client: client}
+func NewPortfolioRedis(client *redis.Client) *roboPortfolioRedis {
+	return &roboPortfolioRedis{client: client}
 }
 
-func (r *portfolioRedis) AddPortfolioToRebalancingQueue(ctx context.Context, userID, portfolioID uint, nextRebalance time.Time) error {
+func (r *roboPortfolioRedis) AddPortfolioToRebalancingQueue(ctx context.Context, userID, portfolioID uint, nextRebalance time.Time) error {
 	key := "rebalancing_queue"
 	score := float64(nextRebalance.Unix())
 	member := fmt.Sprintf("%d:%d", userID, portfolioID)
@@ -41,7 +41,7 @@ func (r *portfolioRedis) AddPortfolioToRebalancingQueue(ctx context.Context, use
 	return err
 }
 
-func (r *portfolioRedis) GetNextRebalanceTime(ctx context.Context, userID, portfolioID uint) (time.Time, error) {
+func (r *roboPortfolioRedis) GetNextRebalanceTime(ctx context.Context, userID, portfolioID uint) (time.Time, error) {
 	key := "rebalancing_queue"
 	member := fmt.Sprintf("%d:%d", userID, portfolioID)
 
@@ -56,7 +56,7 @@ func (r *portfolioRedis) GetNextRebalanceTime(ctx context.Context, userID, portf
 	return time.Unix(int64(nextRebalanceTime), 0), nil
 }
 
-func (r *portfolioRedis) DeletePortfolioFromQueue(ctx context.Context, userID, portfolioID uint) error {
+func (r *roboPortfolioRedis) DeletePortfolioFromQueue(ctx context.Context, userID, portfolioID uint) error {
 	key := "rebalancing_queue"
 	member := fmt.Sprintf("%d:%d", userID, portfolioID)
 	_, err := r.client.ZRem(ctx, key, member).Result()
@@ -67,7 +67,7 @@ func (r *portfolioRedis) DeletePortfolioFromQueue(ctx context.Context, userID, p
 	return nil
 }
 
-func (r *portfolioRedis) GetDuePortfolios(ctx context.Context) ([]string, error) {
+func (r *roboPortfolioRedis) GetDuePortfolios(ctx context.Context) ([]string, error) {
 	key := "rebalancing_queue"
 	now := float64(time.Now().Unix())
 
@@ -92,7 +92,7 @@ func (r *portfolioRedis) GetDuePortfolios(ctx context.Context) ([]string, error)
 	return portfolios, nil
 }
 
-func (r *portfolioRedis) IsEmpty(ctx context.Context) (bool, error) {
+func (r *roboPortfolioRedis) IsEmpty(ctx context.Context) (bool, error) {
 	key := "rebalancing_queue"
 	card, err := r.client.ZCard(ctx, key).Result()
 	if err != nil {
@@ -102,7 +102,7 @@ func (r *portfolioRedis) IsEmpty(ctx context.Context) (bool, error) {
 	return card == 0, nil
 }
 
-func (r *portfolioRedis) AcquireLock(ctx context.Context, userID, portfolioID uint, ttl time.Duration) (bool, error) {
+func (r *roboPortfolioRedis) AcquireLock(ctx context.Context, userID, portfolioID uint, ttl time.Duration) (bool, error) {
 	lockKey := fmt.Sprintf("rebalancing_lock:%d:%d", userID, portfolioID)
 
 	success, err := r.client.SetNX(ctx, lockKey, "locked", ttl).Result()
@@ -112,7 +112,7 @@ func (r *portfolioRedis) AcquireLock(ctx context.Context, userID, portfolioID ui
 	return success, nil
 }
 
-func (r *portfolioRedis) ReleaseLock(ctx context.Context, userID, portfolioID uint) error {
+func (r *roboPortfolioRedis) ReleaseLock(ctx context.Context, userID, portfolioID uint) error {
 	lockKey := fmt.Sprintf("rebalancing_lock:%d:%d", userID, portfolioID)
 	_, err := r.client.Del(ctx, lockKey).Result()
 	return err
