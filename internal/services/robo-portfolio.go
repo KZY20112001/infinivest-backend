@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"strconv"
 	"sync"
 
 	"github.com/KZY20112001/infinivest-backend/internal/caches"
@@ -26,25 +25,23 @@ type RoboPortfolioService interface {
 }
 
 type roboPortfolioServiceImpl struct {
-	repo           repositories.RoboPortfolioRepo
-	cache          caches.RoboPortfolioCache
-	profileService ProfileService
-	genAIService   GenAIService
+	repo         repositories.RoboPortfolioRepo
+	cache        caches.RoboPortfolioCache
+	genAIService GenAIService
 }
 
-func NewRoboPortfolioService(pr repositories.RoboPortfolioRepo, pc caches.RoboPortfolioCache, ps ProfileService, gs GenAIService) *roboPortfolioServiceImpl {
-	return &roboPortfolioServiceImpl{repo: pr, cache: pc, profileService: ps, genAIService: gs}
+func NewRoboPortfolioService(pr repositories.RoboPortfolioRepo, pc caches.RoboPortfolioCache, gs GenAIService) *roboPortfolioServiceImpl {
+	return &roboPortfolioServiceImpl{repo: pr, cache: pc, genAIService: gs}
 }
 
 func (s *roboPortfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error {
 	_, err := s.repo.GetRoboPortfolio(userID)
 	if err == nil {
-		return err
+		return fmt.Errorf("roboportfolio already exists for user %d", userID)
 	}
 
 	portfolio := models.RoboPortfolio{
 		UserID:        userID,
-		Name:          strconv.FormatUint(uint64(userID), 10) + " Robo Advisor Portfolio",
 		Category:      []*models.RoboPortfolioCategory{},
 		RebalanceFreq: &req.Frequency,
 	}
@@ -81,7 +78,7 @@ func (s *roboPortfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.Confirm
 
 		portfolio.Category = append(portfolio.Category, category)
 	}
-	return s.repo.CreatePortfolio(&portfolio)
+	return s.repo.CreateRoboPortfolio(&portfolio)
 }
 
 func (s *roboPortfolioServiceImpl) GetRoboPortfolio(userID uint) (*models.RoboPortfolio, error) {
@@ -134,7 +131,7 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 	}
 	if amount <= cashCategory.TotalAmount {
 		cashCategory.TotalAmount -= amount
-		if _, err := s.repo.UpdatePortfolio(portfolio); err != nil {
+		if err := s.repo.UpdateRoboPortfolio(portfolio); err != nil {
 			return 0, err
 		}
 		return amount, nil
@@ -190,7 +187,7 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 		}
 	}
 
-	if _, err := s.repo.UpdatePortfolio(portfolio); err != nil {
+	if err := s.repo.UpdateRoboPortfolio(portfolio); err != nil {
 		return 0, err
 	}
 	return originalAmount - amount, nil
@@ -256,7 +253,7 @@ func (s *roboPortfolioServiceImpl) addMoneyToPortfolio(portfolio *models.RoboPor
 	}
 
 	// save the updated portfolio
-	if _, err := s.repo.UpdatePortfolio(portfolio); err != nil {
+	if err := s.repo.UpdateRoboPortfolio(portfolio); err != nil {
 		return err
 	}
 	return nil
@@ -330,7 +327,10 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(userID, portfolioID uint) 
 		}
 		*totalCash = targetCash
 	}
-	return s.repo.UpdatePortfolio(portfolio)
+	if err := s.repo.UpdateRoboPortfolio(portfolio); err != nil {
+		return &models.RoboPortfolio{}, err
+	}
+	return portfolio, nil
 }
 
 func (s *roboPortfolioServiceImpl) getPortfolioValue(portfolio *models.RoboPortfolio, latestAssetPricess map[string]float64) (float64, error) {

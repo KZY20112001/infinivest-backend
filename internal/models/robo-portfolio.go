@@ -5,7 +5,6 @@ import "gorm.io/gorm"
 type RoboPortfolio struct {
 	gorm.Model
 	UserID        uint `gorm:"primaryKey"`
-	Name          string
 	Category      []*RoboPortfolioCategory
 	RebalanceFreq *string
 }
