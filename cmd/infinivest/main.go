@@ -8,21 +8,21 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/KZY20112001/infinivest-backend/internal/conf"
 	"github.com/KZY20112001/infinivest-backend/internal/db"
-	"github.com/KZY20112001/infinivest-backend/internal/handlers"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
-	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 	"github.com/KZY20112001/infinivest-backend/internal/routes"
-	"github.com/KZY20112001/infinivest-backend/internal/services"
+	"github.com/KZY20112001/infinivest-backend/internal/setup"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
 var (
-	postgresDB *gorm.DB
-	// redisClient *redis.Client
+	postgresDB  *gorm.DB
+	redisClient *redis.Client
 )
 
 func init() {
@@ -35,65 +35,52 @@ func init() {
 	if err != nil {
 		log.Fatalf("error in connecting to database: %v", err.Error())
 	}
-	postgresDB.AutoMigrate(&models.User{}, &models.Profile{}, &models.Portfolio{}, &models.PortfolioCategory{}, &models.PortfolioAsset{})
+	postgresDB.AutoMigrate(&models.User{}, &models.Profile{}, &models.RoboPortfolio{}, &models.RoboPortfolioCategory{}, &models.RoboPortfolioAsset{})
 
-	// redisClient, err = db.ConnectToRedis()
-	// if err != nil {
-	// 	log.Fatalf("error in connecting to redis: %w", err.Error())
-	// }
-}
-
-func initUserService(db *gorm.DB) services.UserService {
-	repo := repositories.NewPostgresUserRepo(db)
-	return services.NewUserServiceImpl(repo)
-}
-
-func initProfileService(db *gorm.DB, us services.UserService) services.ProfileService {
-	repo := repositories.NewPostgresProfileRepo(db)
-	return services.NewProfileServiceImpl(repo, us)
-}
-
-func initS3Service(client *s3.PresignClient) services.S3Service {
-	repo := repositories.NewS3RepositoryImpl(client)
-	return services.NewS3ServiceImpl(repo)
-}
-
-func initGenAIService() services.GenAIService {
-	baseUrl := "http://localhost:5000"
-	genAIRepo := repositories.NewFlaskMicroservice(baseUrl)
-	return services.NewGenAIService(genAIRepo)
-}
-
-func initPortfolioService(db *gorm.DB, ps services.ProfileService) services.PortfolioService {
-	portfolioRepo := repositories.NewPostgresPortfolioRepo(db)
-	return services.NewPortfolioService(portfolioRepo, ps)
-}
-
-func initHandlers(db *gorm.DB, s3Client *s3.PresignClient) (*handlers.UserHandler, *handlers.ProfileHandler, *handlers.PortfolioHandler, *handlers.S3Handler) {
-	genAIService := initGenAIService()
-	s3Service := initS3Service(s3Client)
-	userService := initUserService(db)
-	profileService := initProfileService(db, userService)
-	portfolioService := initPortfolioService(db, profileService)
-	return handlers.NewUserHandler(userService),
-		handlers.NewProfileHandler(profileService),
-		handlers.NewPortfolioHandler(portfolioService, genAIService),
-		handlers.NewS3Handler(s3Service)
+	redisClient, err = db.ConnectToRedis()
+	if err != nil {
+		log.Fatalf("error in connecting to redis: %v", err.Error())
+	}
 }
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-southeast-1"))
 	if err != nil {
 		log.Fatalf("unable to load SDK config, %v", err)
 	}
+
+	appConf := conf.LoadConfig()
+
 	s3Client := s3.NewFromConfig(cfg)
 	presignClient := s3.NewPresignClient(s3Client)
-	userHandler, profileHandler, portfolioHandler, s3Handler := initHandlers(postgresDB, presignClient)
 
-	r := routes.RegisterRoutes(userHandler, profileHandler, portfolioHandler, s3Handler)
+	// init repositories
+	userRepo, profileRepo, roboPortfolioRepo, s3Repo, genAIRepo := setup.Repositories(
+		postgresDB, presignClient, appConf.FlaskMicroserviceURL,
+	)
+
+	// init caches
+	portfolioCache := setup.Caches(redisClient)
+
+	// init services
+	userService, profileService, roboPortfolioService, manualPortfolioService, s3Service, genAIService := setup.Services(
+		portfolioCache, userRepo, profileRepo, roboPortfolioRepo, s3Repo, genAIRepo,
+	)
+
+	// init handlers
+	userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, s3Handler := setup.Handlers(
+		userService, profileService, roboPortfolioService, manualPortfolioService, s3Service, genAIService,
+	)
+
+	// init schedulers
+	portfolioScheduler := setup.PortfolioScheduler(
+		roboPortfolioService, roboPortfolioRepo, portfolioCache,
+	)
+
+	portfolioScheduler.Start(ctx)
+	r := routes.RegisterRoutes(userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, s3Handler)
 	srv := &http.Server{
 		Addr:    ":8080",
 		Handler: r,
@@ -109,14 +96,13 @@ func main() {
 
 	// Listen for the interrupt signal.
 	<-ctx.Done()
-
-	// Restore default behavior on the interrupt signal and notify user of shutdown.
 	stop()
+	// Restore default behavior on the interrupt signal and notify user of shutdown.
 	log.Println("shutting down gracefully, press Ctrl+C again to force")
 
 	// The context is used to inform the server it has 5 seconds to finish
 	// the request it is currently handling
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatal("Server forced to shutdown: ", err)

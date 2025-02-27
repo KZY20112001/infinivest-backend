@@ -6,21 +6,26 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterPortfolioRoutes(r *gin.Engine, h *handlers.PortfolioHandler) {
+func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, mh *handlers.ManualPortfolioHandler) {
 	portfolioGroup := r.Group("/portfolio")
 	portfolioGroup.Use(middlewares.AuthMiddleware())
+
 	roboAdvisorGroup := portfolioGroup.Group("/robo-advisor")
 	{
-		roboAdvisorGroup.POST("/generate/categories", h.GenerateRoboAdvisorPortfolio)
-		roboAdvisorGroup.POST("/generate/assets", h.GenerateAssetAllocation)
-		roboAdvisorGroup.POST("/confirm", h.ConfirmGeneratedRoboPortfolio)
-		roboAdvisorGroup.GET("/:user_id/:portfolio_id", h.GetPortfolio)
+		roboAdvisorGroup.POST("/generate/categories", rh.GenerateRoboAdvisorPortfolio)
+		roboAdvisorGroup.POST("/generate/assets", rh.GenerateAssetAllocation)
+		roboAdvisorGroup.POST("/confirm", rh.ConfirmGeneratedRoboPortfolio)
+		roboAdvisorGroup.GET("/", rh.GetRoboPortfolio)
+		roboAdvisorGroup.POST("/add", rh.AddMoneyToRoboPortfolio)
+		roboAdvisorGroup.POST("/withdraw", rh.WithDrawMoneyFromRoboPortfolio)
+		roboAdvisorGroup.PUT("/rebalance-freq", rh.UpdateRebalanceFreq)
+		roboAdvisorGroup.DELETE("/", rh.DeleteRoboPortfolio)
 	}
 
 	manualGroup := portfolioGroup.Group("/manual")
 	{
 		manualGroup.POST("/")
 		manualGroup.PATCH("/")
-		manualGroup.GET("/")
+		manualGroup.GET("/", mh.GetManualPortfolios)
 	}
 }

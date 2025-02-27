@@ -2,26 +2,32 @@ package models
 
 import "gorm.io/gorm"
 
-type Portfolio struct {
+type RoboPortfolio struct {
 	gorm.Model
 	UserID        uint `gorm:"primaryKey"`
 	Name          string
-	IsRoboAdvisor bool
-	Category      []PortfolioCategory
+	Category      []*RoboPortfolioCategory
+	RebalanceFreq *string
 }
 
-type PortfolioCategory struct {
-	ID              uint `gorm:"primaryKey"`
-	PortfolioID     uint `gorm:"not null"`
-	PortfolioUserID uint `gorm:"not null"`
-	Name            string
-	TotalPercentage float64
-	Assets          []PortfolioAsset
+type RoboPortfolioCategory struct {
+	gorm.Model
+	RoboPortfolioID     uint `gorm:"not null"`
+	RoboPortfolioUserID uint `gorm:"not null"`
+	Name                string
+	TotalPercentage     float64
+	TotalAmount         float64
+	Assets              []*RoboPortfolioAsset
 }
 
-type PortfolioAsset struct {
-	ID                  uint `gorm:"primaryKey"`
-	PortfolioCategoryID uint `gorm:"not null"`
-	Symbol              string
-	Percentage          float64
+type RoboPortfolioAsset struct {
+	gorm.Model
+	RoboPortfolioCategoryID uint
+
+	Symbol     string
+	Percentage float64
+
+	SharesOwned   float64
+	TotalInvested float64
+	AvgBuyPrice   float64
 }

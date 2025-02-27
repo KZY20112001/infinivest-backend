@@ -8,8 +8,6 @@ type RoboAdvisorPortfolio struct {
 	IntermediateBonds   float64 `json:"intermediate_bonds"`
 	InternationalBonds  float64 `json:"international_bonds"`
 	Cash                float64 `json:"cash"`
-	Commodities         float64 `json:"commodities"`
-	REITs               float64 `json:"reits"`
 }
 
 type RoboAdvisorRecommendationResponse struct {
@@ -37,4 +35,17 @@ type AssetAllocationResponse struct {
 type ConfirmPortfolioRequest struct {
 	Portfolio   map[string]float64 `json:"portfolio"`
 	Allocations map[string]Assets  `json:"allocations"`
+	Frequency   string             `json:"frequency"`
+}
+
+type AddMoneyRequest struct {
+	Amount float64 `json:"amount"`
+}
+
+type WithdrawMoneyRequest struct {
+	Amount float64 `json:"amount"`
+}
+
+type UpdateRebalanceFreqRequest struct {
+	Frequency string `json:"frequency"`
 }

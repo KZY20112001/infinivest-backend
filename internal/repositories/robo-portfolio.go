@@ -1,0 +1,165 @@
+package repositories
+
+import (
+	"errors"
+	"fmt"
+
+	"github.com/KZY20112001/infinivest-backend/internal/commons"
+	"github.com/KZY20112001/infinivest-backend/internal/models"
+	"gorm.io/gorm"
+)
+
+type RoboPortfolioRepo interface {
+	CreatePortfolio(portfolio *models.RoboPortfolio) error
+	GetRoboPortfolio(userID uint) (*models.RoboPortfolio, error)
+	DeleteRoboPortfolio(userID uint) error
+	UpdateRebalanceFreq(userID uint, freq string) error
+	GetManualPortfolios(userID uint) ([]models.RoboPortfolio, error)
+	UpdatePortfolio(portfolio *models.RoboPortfolio) (*models.RoboPortfolio, error)
+}
+
+type postgresRoboPortfolioRepo struct {
+	db *gorm.DB
+}
+
+func NewPostgresRoboPortfolioRepo(db *gorm.DB) *postgresRoboPortfolioRepo {
+	return &postgresRoboPortfolioRepo{db: db}
+}
+
+func (r *postgresRoboPortfolioRepo) CreatePortfolio(portfolio *models.RoboPortfolio) error {
+	if portfolio == nil {
+		return commons.ErrNil
+	}
+	if err := r.db.Create(&portfolio).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return gorm.ErrDuplicatedKey
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (r *postgresRoboPortfolioRepo) GetRoboPortfolio(userID uint) (*models.RoboPortfolio, error) {
+	var portfolio models.RoboPortfolio
+	if err := r.db.
+		Where("user_id = ?", userID).
+		Preload("Category").
+		Preload("Category.Assets").
+		First(&portfolio).Error; err != nil {
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, gorm.ErrRecordNotFound
+		}
+
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, gorm.ErrDuplicatedKey
+		}
+		return nil, err
+	}
+
+	return &portfolio, nil
+}
+
+func (r *postgresRoboPortfolioRepo) DeleteRoboPortfolio(userID uint) error {
+	portfolio, err := r.GetRoboPortfolio(userID)
+	if err != nil {
+		return err
+	}
+
+	tx := r.db.Begin()
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	for _, category := range portfolio.Category {
+		for _, asset := range category.Assets {
+			if err := tx.Delete(&asset).Error; err != nil {
+				tx.Rollback()
+				return fmt.Errorf("failed to delete asset %s: %w", asset.Symbol, err)
+			}
+		}
+	}
+
+	for _, category := range portfolio.Category {
+		if err := tx.Delete(&category).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to delete category %s: %w", category.Name, err)
+		}
+	}
+
+	if err := tx.Delete(&portfolio).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete portfolio: %w", err)
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+func (r *postgresRoboPortfolioRepo) GetManualPortfolios(userID uint) ([]models.RoboPortfolio, error) {
+	var portfolios []models.RoboPortfolio
+	if err := r.db.
+		Where("user_id = ? AND is_robo_advisor = ?", userID, false).
+		Find(&portfolios).Error; err != nil {
+		return nil, err
+	}
+	return portfolios, nil
+}
+
+func (r *postgresRoboPortfolioRepo) UpdatePortfolio(portfolio *models.RoboPortfolio) (*models.RoboPortfolio, error) {
+	tx := r.db.Begin()
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	if err := tx.Save(&portfolio).Error; err != nil {
+		tx.Rollback()
+		return &models.RoboPortfolio{}, fmt.Errorf("failed to update portfolio: %w", err)
+	}
+
+	for _, category := range portfolio.Category {
+		if err := tx.Save(&category).Error; err != nil {
+			tx.Rollback()
+			return &models.RoboPortfolio{}, fmt.Errorf("failed to update category %s: %w", category.Name, err)
+		}
+
+		for _, asset := range category.Assets {
+			if err := tx.Save(&asset).Error; err != nil {
+				tx.Rollback()
+				return &models.RoboPortfolio{}, fmt.Errorf("failed to update asset %s: %w", asset.Symbol, err)
+			}
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return &models.RoboPortfolio{}, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return portfolio, nil
+}
+
+func (r *postgresRoboPortfolioRepo) UpdateRebalanceFreq(userID uint, freq string) error {
+	portfolio, err := r.GetRoboPortfolio(userID)
+	if err != nil {
+		return err
+	}
+	if err := r.db.Model(&portfolio).Update("rebalance_freq", freq).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return gorm.ErrDuplicatedKey
+		}
+		return err
+	}
+	return nil
+}

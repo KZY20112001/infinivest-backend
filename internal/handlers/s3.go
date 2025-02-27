@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/KZY20112001/infinivest-backend/internal/commons"
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
 	"github.com/KZY20112001/infinivest-backend/internal/services"
 	"github.com/gin-gonic/gin"
@@ -25,7 +26,7 @@ func (h *S3Handler) GeneratePresignedUploadURL(c *gin.Context) {
 
 	presignedUrl, err := h.s3Service.GeneratePresignedUploadURL(c, req)
 	if err != nil {
-		HandleError(c, err)
+		commons.HandleError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"url": presignedUrl})

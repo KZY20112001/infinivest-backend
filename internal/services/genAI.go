@@ -12,6 +12,7 @@ import (
 type GenAIService interface {
 	GenerateRoboAdvisorPortfolio(bankStatement *multipart.FileHeader, bankName, toleranceLevel string) (dto.RoboAdvisorRecommendationResponse, error)
 	GenerateAssetAllocations(req dto.AssetAllocationRequest) (dto.AssetAllocationResponse, error)
+	GetLatestAssetPrice(symbol string) (float64, error)
 }
 
 type genAIServiceImpl struct {
@@ -38,9 +39,24 @@ func (s *genAIServiceImpl) GenerateAssetAllocations(req dto.AssetAllocationReque
 
 	var wg sync.WaitGroup
 	for category, percentage := range req.Portfolio {
-
+		if category == "cash" {
+			continue
+		}
 		wg.Add(1)
-		go s.generateAssetAllocation(category, percentage, &wg, resChan)
+		go func(category string, percentage float64) {
+			defer wg.Done()
+			if percentage == 0 {
+				resChan <- CategoryResult{Category: category, Assets: dto.Assets{Assets: []dto.Asset{}}}
+				return
+			}
+			assets, err := s.repo.GenerateAssetAllocation(category, percentage)
+			if err != nil {
+				resChan <- CategoryResult{Category: category, Error: err}
+			} else {
+				resChan <- CategoryResult{Category: category, Assets: assets}
+			}
+
+		}(category, percentage)
 	}
 
 	wg.Wait()
@@ -61,16 +77,6 @@ func (s *genAIServiceImpl) GenerateAssetAllocations(req dto.AssetAllocationReque
 	return dto.AssetAllocationResponse{Allocations: allocations}, nil
 }
 
-func (s *genAIServiceImpl) generateAssetAllocation(category string, percentage float64, wg *sync.WaitGroup, resChan chan<- CategoryResult) {
-	defer wg.Done()
-	if percentage == 0 {
-		resChan <- CategoryResult{Category: category, Assets: dto.Assets{Assets: []dto.Asset{}}}
-		return
-	}
-	assets, err := s.repo.GenerateAssetAllocation(category, percentage)
-	if err != nil {
-		resChan <- CategoryResult{Category: category, Error: err}
-	} else {
-		resChan <- CategoryResult{Category: category, Assets: assets}
-	}
+func (s *genAIServiceImpl) GetLatestAssetPrice(symbol string) (float64, error) {
+	return s.repo.GetLatestAssetPrice(symbol)
 }
