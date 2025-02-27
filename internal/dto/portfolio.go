@@ -38,6 +38,10 @@ type ConfirmPortfolioRequest struct {
 	Frequency   string             `json:"frequency"`
 }
 
+type UpdateRebalanceFreqRequest struct {
+	Frequency string `json:"frequency"`
+}
+
 type AddMoneyRequest struct {
 	Amount float64 `json:"amount"`
 }
@@ -46,6 +50,6 @@ type WithdrawMoneyRequest struct {
 	Amount float64 `json:"amount"`
 }
 
-type UpdateRebalanceFreqRequest struct {
-	Frequency string `json:"frequency"`
+type ManualPortfolioRequest struct {
+	Name string `json:"name"`
 }

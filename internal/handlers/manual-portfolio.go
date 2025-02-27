@@ -42,7 +42,7 @@ func (h *ManualPortfolioHandler) GetManualPortfolios(c *gin.Context) {
 }
 
 func (h *ManualPortfolioHandler) GetManualPortfolio(c *gin.Context) {
-	portfolioName := c.Param("portfolio_name")
+	portfolioName := c.Param("name")
 	userID := c.GetUint("id")
 	portfolio, err := h.service.GetManualPortfolio(userID, portfolioName)
 	if err != nil {
@@ -50,4 +50,35 @@ func (h *ManualPortfolioHandler) GetManualPortfolio(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"portfolio": portfolio})
+}
+
+func (h *ManualPortfolioHandler) AddMoneyToManualPortfolio(c *gin.Context) {
+	var req dto.AddMoneyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	userID := c.GetUint("id")
+	portfolioName := c.Param("name")
+	if err := h.service.AddMoneyToManualPortfolio(userID, portfolioName, req.Amount); err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Money added successfully"})
+}
+
+func (h *ManualPortfolioHandler) WithDrawMoneyFromManualPortfolio(c *gin.Context) {
+	var req dto.WithdrawMoneyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	userID := c.GetUint("id")
+	portfolioName := c.Param("name")
+	amountWithdrawn, err := h.service.WithdrawMoneyFromManualPortfolio(userID, portfolioName, req.Amount)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"amount": amountWithdrawn})
 }

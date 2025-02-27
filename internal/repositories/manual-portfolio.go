@@ -36,7 +36,7 @@ func (r *postgresManualPortfolioRepo) CreateManualPortfolio(portfolio *models.Ma
 		}
 		return err
 	}
-
+	fmt.Println("portfolio created", portfolio)
 	return nil
 }
 

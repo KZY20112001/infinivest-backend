@@ -24,8 +24,10 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 
 	manualGroup := portfolioGroup.Group("/manual")
 	{
-		manualGroup.POST("/")
-		manualGroup.PATCH("/")
+		manualGroup.POST("/", mh.CreateManualPortfolio)
+		manualGroup.POST("/:name/add", mh.AddMoneyToManualPortfolio)
+		manualGroup.POST("/:name/withdraw", mh.WithDrawMoneyFromManualPortfolio)
 		manualGroup.GET("/", mh.GetManualPortfolios)
+		manualGroup.GET("/:name", mh.GetManualPortfolio)
 	}
 }

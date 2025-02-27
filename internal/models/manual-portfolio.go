@@ -6,11 +6,11 @@ type ManualPortfolio struct {
 	gorm.Model
 	UserID    uint   `gorm:"primaryKey"`
 	Name      string `gorm:"uniqueIndex"`
-	Assets    []*ManualPortfolioAssets
+	Assets    []*ManualPortfolioAsset
 	TotalCash float64
 }
 
-type ManualPortfolioAssets struct {
+type ManualPortfolioAsset struct {
 	gorm.Model
 	ManualPortfolioID     uint
 	ManualPortfolioUserID uint
