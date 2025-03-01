@@ -54,7 +54,7 @@ func (r *postgresManualPortfolioRepo) GetManualPortfolios(userID uint) ([]*model
 
 func (r *postgresManualPortfolioRepo) GetManualPortfolio(userID uint, portfolioName string) (*models.ManualPortfolio, error) {
 	var portfolio models.ManualPortfolio
-	if err := r.db.Where("user_id = ? AND name = ?", userID, portfolioName).First(&portfolio).Error; err != nil {
+	if err := r.db.Where("user_id = ? AND name = ?", userID, portfolioName).Preload("Assets").First(&portfolio).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, gorm.ErrRecordNotFound
 		}

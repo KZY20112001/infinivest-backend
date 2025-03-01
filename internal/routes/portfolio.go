@@ -12,10 +12,11 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 
 	roboAdvisorGroup := portfolioGroup.Group("/robo-advisor")
 	{
+		roboAdvisorGroup.GET("/")
+		roboAdvisorGroup.GET("/details", rh.GetRoboPortfolio)
 		roboAdvisorGroup.POST("/generate/categories", rh.GenerateRoboAdvisorPortfolio)
 		roboAdvisorGroup.POST("/generate/assets", rh.GenerateAssetAllocation)
 		roboAdvisorGroup.POST("/confirm", rh.ConfirmGeneratedRoboPortfolio)
-		roboAdvisorGroup.GET("/", rh.GetRoboPortfolio)
 		roboAdvisorGroup.POST("/add", rh.AddMoneyToRoboPortfolio)
 		roboAdvisorGroup.POST("/withdraw", rh.WithDrawMoneyFromRoboPortfolio)
 		roboAdvisorGroup.PUT("/rebalance-freq", rh.UpdateRebalanceFreq)

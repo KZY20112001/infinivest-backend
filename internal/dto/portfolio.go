@@ -20,6 +20,7 @@ type AssetAllocationRequest struct {
 }
 
 type Asset struct {
+	Name       string  `json:"name"`
 	Symbol     string  `json:"symbol"`
 	Percentage float64 `json:"percentage"`
 }

@@ -42,7 +42,7 @@ func (s *roboPortfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.Confirm
 
 	portfolio := models.RoboPortfolio{
 		UserID:        userID,
-		Category:      []*models.RoboPortfolioCategory{},
+		Categories:    []*models.RoboPortfolioCategory{},
 		RebalanceFreq: &req.Frequency,
 	}
 
@@ -54,7 +54,7 @@ func (s *roboPortfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.Confirm
 		TotalAmount:     0,
 		Assets:          []*models.RoboPortfolioAsset{},
 	}
-	portfolio.Category = append(portfolio.Category, cashCategory)
+	portfolio.Categories = append(portfolio.Categories, cashCategory)
 
 	for categoryName, assets := range req.Allocations {
 		category := &models.RoboPortfolioCategory{
@@ -68,6 +68,7 @@ func (s *roboPortfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.Confirm
 		for _, asset := range assets.Assets {
 			category.Assets = append(category.Assets, &models.RoboPortfolioAsset{
 				RoboPortfolioCategoryID: category.ID,
+				Name:                    asset.Name,
 				Symbol:                  asset.Symbol,
 				Percentage:              asset.Percentage,
 				SharesOwned:             0,
@@ -76,7 +77,7 @@ func (s *roboPortfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.Confirm
 			})
 		}
 
-		portfolio.Category = append(portfolio.Category, category)
+		portfolio.Categories = append(portfolio.Categories, category)
 	}
 	return s.repo.CreateRoboPortfolio(&portfolio)
 }
@@ -123,7 +124,7 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 	}
 	var cashCategory *models.RoboPortfolioCategory
 
-	for _, category := range portfolio.Category {
+	for _, category := range portfolio.Categories {
 		if category.Name == "cash" {
 			cashCategory = category
 			break
@@ -142,7 +143,7 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 	cashCategory.TotalAmount = 0
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	for _, category := range portfolio.Category {
+	for _, category := range portfolio.Categories {
 		if category.Name == "cash" || category.TotalPercentage == 0 {
 			continue
 		}
@@ -199,6 +200,9 @@ func (s *roboPortfolioServiceImpl) UpdateRebalanceFreq(ctx context.Context, user
 		return err
 	}
 
+	if portfolio.RebalanceFreq != nil && *portfolio.RebalanceFreq == freq {
+		return nil
+	}
 	if _, err := s.RebalancePortfolio(userID, portfolio.ID); err != nil {
 		return err
 	}
@@ -220,7 +224,7 @@ func (s *roboPortfolioServiceImpl) UpdateRebalanceFreq(ctx context.Context, user
 
 func (s *roboPortfolioServiceImpl) addMoneyToPortfolio(portfolio *models.RoboPortfolio, amount float64) error {
 	var wg sync.WaitGroup
-	for _, category := range portfolio.Category {
+	for _, category := range portfolio.Categories {
 		categoryTotal := amount * category.TotalPercentage / 100
 		category.TotalAmount += categoryTotal
 		if category.Name == "cash" || category.TotalPercentage == 0 {
@@ -280,7 +284,7 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(userID, portfolioID uint) 
 	overPerformingAssets := []*models.RoboPortfolioAsset{}
 	underPerformingAssets := []*models.RoboPortfolioAsset{}
 	var cashCategory *models.RoboPortfolioCategory
-	for _, category := range portfolio.Category {
+	for _, category := range portfolio.Categories {
 		// handle cash last
 		if category.Name == "cash" {
 			cashCategory = category
@@ -330,6 +334,8 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(userID, portfolioID uint) 
 	if err := s.repo.UpdateRoboPortfolio(portfolio); err != nil {
 		return &models.RoboPortfolio{}, err
 	}
+	log.Println("Rebalanced portfolio:", portfolioID, "for user", userID)
+
 	return portfolio, nil
 }
 
@@ -337,7 +343,7 @@ func (s *roboPortfolioServiceImpl) getPortfolioValue(portfolio *models.RoboPortf
 	var mu sync.Mutex
 
 	totalValue := 0.0
-	for _, category := range portfolio.Category {
+	for _, category := range portfolio.Categories {
 		if category.Name == "cash" {
 			totalValue += category.TotalAmount
 			continue

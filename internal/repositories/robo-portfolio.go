@@ -43,8 +43,8 @@ func (r *postgresRoboPortfolioRepo) GetRoboPortfolio(userID uint) (*models.RoboP
 	var portfolio models.RoboPortfolio
 	if err := r.db.
 		Where("user_id = ?", userID).
-		Preload("Category").
-		Preload("Category.Assets").
+		Preload("Categories").
+		Preload("Categories.Assets").
 		First(&portfolio).Error; err != nil {
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -74,7 +74,7 @@ func (r *postgresRoboPortfolioRepo) DeleteRoboPortfolio(userID uint) error {
 		}
 	}()
 
-	for _, category := range portfolio.Category {
+	for _, category := range portfolio.Categories {
 		for _, asset := range category.Assets {
 			if err := tx.Delete(&asset).Error; err != nil {
 				tx.Rollback()
@@ -83,7 +83,7 @@ func (r *postgresRoboPortfolioRepo) DeleteRoboPortfolio(userID uint) error {
 		}
 	}
 
-	for _, category := range portfolio.Category {
+	for _, category := range portfolio.Categories {
 		if err := tx.Delete(&category).Error; err != nil {
 			tx.Rollback()
 			return fmt.Errorf("failed to delete category %s: %w", category.Name, err)
@@ -121,7 +121,7 @@ func (r *postgresRoboPortfolioRepo) UpdateRoboPortfolio(portfolio *models.RoboPo
 		return fmt.Errorf("failed to update portfolio: %w", err)
 	}
 
-	for _, category := range portfolio.Category {
+	for _, category := range portfolio.Categories {
 		if err := tx.Save(&category).Error; err != nil {
 			tx.Rollback()
 			return fmt.Errorf("failed to update category %s: %w", category.Name, err)

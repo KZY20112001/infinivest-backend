@@ -126,6 +126,5 @@ func (s *portfolioSchedulerImpl) rebalancePortfolios(ctx context.Context) {
 	for err := range errChan {
 		log.Println(err)
 	}
-	log.Println("Rebalancing complete")
 
 }
