@@ -11,7 +11,7 @@ import (
 
 type RoboPortfolioRepo interface {
 	CreateRoboPortfolio(portfolio *models.RoboPortfolio) error
-	GetRoboPortfolio(userID uint) (*models.RoboPortfolio, error)
+	GetRoboPortfolioDetails(userID uint) (*models.RoboPortfolio, error)
 	DeleteRoboPortfolio(userID uint) error
 	UpdateRebalanceFreq(userID uint, freq string) error
 	UpdateRoboPortfolio(portfolio *models.RoboPortfolio) error
@@ -39,7 +39,7 @@ func (r *postgresRoboPortfolioRepo) CreateRoboPortfolio(portfolio *models.RoboPo
 	return nil
 }
 
-func (r *postgresRoboPortfolioRepo) GetRoboPortfolio(userID uint) (*models.RoboPortfolio, error) {
+func (r *postgresRoboPortfolioRepo) GetRoboPortfolioDetails(userID uint) (*models.RoboPortfolio, error) {
 	var portfolio models.RoboPortfolio
 	if err := r.db.
 		Where("user_id = ?", userID).
@@ -61,7 +61,7 @@ func (r *postgresRoboPortfolioRepo) GetRoboPortfolio(userID uint) (*models.RoboP
 }
 
 func (r *postgresRoboPortfolioRepo) DeleteRoboPortfolio(userID uint) error {
-	portfolio, err := r.GetRoboPortfolio(userID)
+	portfolio, err := r.GetRoboPortfolioDetails(userID)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func (r *postgresRoboPortfolioRepo) UpdateRoboPortfolio(portfolio *models.RoboPo
 }
 
 func (r *postgresRoboPortfolioRepo) UpdateRebalanceFreq(userID uint, freq string) error {
-	portfolio, err := r.GetRoboPortfolio(userID)
+	portfolio, err := r.GetRoboPortfolioDetails(userID)
 	if err != nil {
 		return err
 	}

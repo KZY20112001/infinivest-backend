@@ -79,12 +79,22 @@ func (h *RoboPortfolioHandler) ConfirmGeneratedRoboPortfolio(c *gin.Context) {
 
 func (h *RoboPortfolioHandler) GetRoboPortfolio(c *gin.Context) {
 	userID := c.GetUint("id")
-	portfolio, err := h.service.GetRoboPortfolio(userID)
+	portfolio, err := h.service.GetRoboPortfolioDetails(userID)
 	if err != nil {
 		commons.HandleError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"portfolio": portfolio})
+}
+
+func (h *RoboPortfolioHandler) GetRoboPortfolioSummary(c *gin.Context) {
+	userID := c.GetUint("id")
+	summary, err := h.service.GetRoboPortfolioSummary(userID)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"summary": summary})
 }
 
 func (h *RoboPortfolioHandler) DeleteRoboPortfolio(c *gin.Context) {

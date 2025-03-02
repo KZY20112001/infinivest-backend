@@ -16,7 +16,8 @@ import (
 
 type RoboPortfolioService interface {
 	ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error
-	GetRoboPortfolio(userID uint) (*models.RoboPortfolio, error)
+	GetRoboPortfolioDetails(userID uint) (*models.RoboPortfolio, error)
+	GetRoboPortfolioSummary(userID uint) (dto.RoboPortfolioSummaryResponse, error)
 	DeleteRoboPortfolio(userID uint) error
 	AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.RoboPortfolio, error)
 	WithDrawMoneyFromRoboPortfolio(ctx context.Context, userID uint, amount float64) (float64, error)
@@ -35,7 +36,7 @@ func NewRoboPortfolioService(pr repositories.RoboPortfolioRepo, pc caches.RoboPo
 }
 
 func (s *roboPortfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error {
-	_, err := s.repo.GetRoboPortfolio(userID)
+	_, err := s.repo.GetRoboPortfolioDetails(userID)
 	if err == nil {
 		return fmt.Errorf("roboportfolio already exists for user %d", userID)
 	}
@@ -82,16 +83,29 @@ func (s *roboPortfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.Confirm
 	return s.repo.CreateRoboPortfolio(&portfolio)
 }
 
-func (s *roboPortfolioServiceImpl) GetRoboPortfolio(userID uint) (*models.RoboPortfolio, error) {
-	return s.repo.GetRoboPortfolio(userID)
+func (s *roboPortfolioServiceImpl) GetRoboPortfolioDetails(userID uint) (*models.RoboPortfolio, error) {
+	return s.repo.GetRoboPortfolioDetails(userID)
 }
 
+func (s *roboPortfolioServiceImpl) GetRoboPortfolioSummary(userID uint) (dto.RoboPortfolioSummaryResponse, error) {
+	portfolio, err := s.repo.GetRoboPortfolioDetails(userID)
+	if err != nil {
+		return dto.RoboPortfolioSummaryResponse{}, err
+	}
+	totalValue, err := s.getPortfolioValue(portfolio, make(map[string]float64))
+	if err != nil {
+		return dto.RoboPortfolioSummaryResponse{}, err
+	}
+	return dto.RoboPortfolioSummaryResponse{
+		RebalanceFreq: *portfolio.RebalanceFreq,
+		TotalValue:    totalValue}, nil
+}
 func (s *roboPortfolioServiceImpl) DeleteRoboPortfolio(userID uint) error {
 	return s.repo.DeleteRoboPortfolio(userID)
 }
 
 func (s *roboPortfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.RoboPortfolio, error) {
-	portfolio, err := s.repo.GetRoboPortfolio(userID)
+	portfolio, err := s.repo.GetRoboPortfolioDetails(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +132,7 @@ func (s *roboPortfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, 
 }
 
 func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Context, userID uint, amount float64) (float64, error) {
-	portfolio, err := s.repo.GetRoboPortfolio(userID)
+	portfolio, err := s.repo.GetRoboPortfolioDetails(userID)
 	if err != nil {
 		return 0, err
 	}
@@ -195,7 +209,7 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 }
 
 func (s *roboPortfolioServiceImpl) UpdateRebalanceFreq(ctx context.Context, userID uint, freq string) error {
-	portfolio, err := s.repo.GetRoboPortfolio(userID)
+	portfolio, err := s.repo.GetRoboPortfolioDetails(userID)
 	if err != nil {
 		return err
 	}
@@ -265,7 +279,7 @@ func (s *roboPortfolioServiceImpl) addMoneyToPortfolio(portfolio *models.RoboPor
 
 func (s *roboPortfolioServiceImpl) RebalancePortfolio(userID, portfolioID uint) (*models.RoboPortfolio, error) {
 	log.Println("Rebalancing portfolio", portfolioID, "for user", userID)
-	portfolio, err := s.repo.GetRoboPortfolio(userID)
+	portfolio, err := s.repo.GetRoboPortfolioDetails(userID)
 	if err != nil {
 		return &models.RoboPortfolio{}, fmt.Errorf("portfolio %d for user %d returns error: %w", userID, portfolioID, err)
 	}

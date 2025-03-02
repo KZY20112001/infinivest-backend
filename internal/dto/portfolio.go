@@ -15,6 +15,11 @@ type RoboAdvisorRecommendationResponse struct {
 	Reason    string               `json:"reason"`
 }
 
+type RoboPortfolioSummaryResponse struct {
+	RebalanceFreq string  `json:"rebalanceFreq"`
+	TotalValue    float64 `json:"totalValue"`
+}
+
 type AssetAllocationRequest struct {
 	Portfolio map[string]float64 `json:"portfolio"`
 }
