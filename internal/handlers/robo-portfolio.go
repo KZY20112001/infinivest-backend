@@ -21,6 +21,11 @@ func NewRoboPortfolioHandler(ps services.RoboPortfolioService, gs services.GenAI
 
 func (h *RoboPortfolioHandler) GenerateRoboAdvisorPortfolio(c *gin.Context) {
 	bankName := c.PostForm("bank_name")
+	if bankName == "" {
+		commons.HandleError(c, fmt.Errorf("bank name is required"))
+		return
+	}
+
 	riskToleranceLevel := c.PostForm("risk_tolerance_level")
 	if riskToleranceLevel == "" {
 		commons.HandleError(c, fmt.Errorf("risk tolerance level is required"))
@@ -28,6 +33,7 @@ func (h *RoboPortfolioHandler) GenerateRoboAdvisorPortfolio(c *gin.Context) {
 	}
 
 	bankStatement, err := c.FormFile("bank_statement")
+
 	if err != nil {
 		commons.HandleError(c, err)
 		return

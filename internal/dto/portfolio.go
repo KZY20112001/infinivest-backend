@@ -1,12 +1,12 @@
 package dto
 
 type RoboAdvisorPortfolio struct {
-	LargeCapBlend       float64 `json:"large_cap_blend"`
-	SmallCapBlend       float64 `json:"small_cap_blend"`
-	InternationalStocks float64 `json:"international_stocks"`
-	EmergingMarkets     float64 `json:"emerging_markets"`
-	IntermediateBonds   float64 `json:"intermediate_bonds"`
-	InternationalBonds  float64 `json:"international_bonds"`
+	LargeCapBlend       float64 `json:"largeCapBlend"`
+	SmallCapBlend       float64 `json:"smallCapBlend"`
+	InternationalStocks float64 `json:"internationalStocks"`
+	EmergingMarkets     float64 `json:"emergingMarkets"`
+	IntermediateBonds   float64 `json:"intermediateBonds"`
+	InternationalBonds  float64 `json:"internationalBonds"`
 	Cash                float64 `json:"cash"`
 }
 
