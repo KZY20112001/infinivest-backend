@@ -16,9 +16,8 @@ type RoboAdvisorRecommendationResponse struct {
 }
 
 type RoboPortfolioSummaryResponse struct {
-	RebalanceFreq     string             `json:"rebalanceFreq"`
-	TotalValue        float64            `json:"totalValue"`
-	LatestAssetPrices map[string]float64 `json:"latestAssetPrices"`
+	RebalanceFreq string  `json:"rebalanceFreq"`
+	TotalValue    float64 `json:"totalValue"`
 }
 
 type AssetAllocationRequest struct {
@@ -59,4 +58,8 @@ type WithdrawMoneyRequest struct {
 
 type ManualPortfolioRequest struct {
 	Name string `json:"name"`
+}
+
+type ManualPortfolioAssetRequest struct {
+	SharesAmount float64 `json:"sharesAmount"`
 }

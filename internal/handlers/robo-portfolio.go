@@ -103,16 +103,6 @@ func (h *RoboPortfolioHandler) GetRoboPortfolioSummary(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"summary": summary})
 }
 
-func (h *RoboPortfolioHandler) DeleteRoboPortfolio(c *gin.Context) {
-	userID := c.GetUint("id")
-	err := h.service.DeleteRoboPortfolio(userID)
-	if err != nil {
-		commons.HandleError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "Successfully deleted the portfolio"})
-}
-
 func (h *RoboPortfolioHandler) AddMoneyToRoboPortfolio(c *gin.Context) {
 	var req dto.AddMoneyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -161,4 +151,14 @@ func (h *RoboPortfolioHandler) UpdateRebalanceFreq(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully updated the rebalance frequency"})
+}
+
+func (h *RoboPortfolioHandler) DeleteRoboPortfolio(c *gin.Context) {
+	userID := c.GetUint("id")
+	err := h.service.DeleteRoboPortfolio(c.Request.Context(), userID)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully deleted the portfolio"})
 }

@@ -12,9 +12,9 @@ import (
 type RoboPortfolioRepo interface {
 	CreateRoboPortfolio(portfolio *models.RoboPortfolio) error
 	GetRoboPortfolioDetails(userID uint) (*models.RoboPortfolio, error)
-	DeleteRoboPortfolio(userID uint) error
 	UpdateRebalanceFreq(userID uint, freq string) error
 	UpdateRoboPortfolio(portfolio *models.RoboPortfolio) error
+	DeleteRoboPortfolio(portfolio *models.RoboPortfolio) error
 }
 
 type postgresRoboPortfolioRepo struct {
@@ -58,49 +58,6 @@ func (r *postgresRoboPortfolioRepo) GetRoboPortfolioDetails(userID uint) (*model
 	}
 
 	return &portfolio, nil
-}
-
-func (r *postgresRoboPortfolioRepo) DeleteRoboPortfolio(userID uint) error {
-	portfolio, err := r.GetRoboPortfolioDetails(userID)
-	if err != nil {
-		return err
-	}
-
-	tx := r.db.Begin()
-
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	for _, category := range portfolio.Categories {
-		for _, asset := range category.Assets {
-			if err := tx.Delete(&asset).Error; err != nil {
-				tx.Rollback()
-				return fmt.Errorf("failed to delete asset %s: %w", asset.Symbol, err)
-			}
-		}
-	}
-
-	for _, category := range portfolio.Categories {
-		if err := tx.Delete(&category).Error; err != nil {
-			tx.Rollback()
-			return fmt.Errorf("failed to delete category %s: %w", category.Name, err)
-		}
-	}
-
-	if err := tx.Delete(&portfolio).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to delete portfolio: %w", err)
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
 }
 
 func (r *postgresRoboPortfolioRepo) UpdateRoboPortfolio(portfolio *models.RoboPortfolio) error {
@@ -154,5 +111,43 @@ func (r *postgresRoboPortfolioRepo) UpdateRebalanceFreq(userID uint, freq string
 		}
 		return err
 	}
+	return nil
+}
+
+func (r *postgresRoboPortfolioRepo) DeleteRoboPortfolio(portfolio *models.RoboPortfolio) error {
+	tx := r.db.Begin()
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	for _, category := range portfolio.Categories {
+		for _, asset := range category.Assets {
+			if err := tx.Delete(&asset).Error; err != nil {
+				tx.Rollback()
+				return fmt.Errorf("failed to delete asset %s: %w", asset.Symbol, err)
+			}
+		}
+	}
+
+	for _, category := range portfolio.Categories {
+		if err := tx.Delete(&category).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to delete category %s: %w", category.Name, err)
+		}
+	}
+
+	if err := tx.Delete(&portfolio).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete portfolio: %w", err)
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
 	return nil
 }

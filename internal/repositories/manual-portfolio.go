@@ -10,11 +10,12 @@ import (
 )
 
 type ManualPortfolioRepo interface {
-	CreateManualPortfolio(portfolio *models.ManualPortfolio) error
 	GetManualPortfolios(userID uint) ([]*models.ManualPortfolio, error)
 	GetManualPortfolio(userID uint, portfolioName string) (*models.ManualPortfolio, error)
-	DeleteManualPortfolio(userID uint, portfolioName string) error
+	CreateManualPortfolio(portfolio *models.ManualPortfolio) error
+	UpdateManualPortfolioName(portfolio *models.ManualPortfolio, newName string) error
 	UpdateManualPortfolio(portfolio *models.ManualPortfolio) error
+	DeleteManualPortfolio(portfolio *models.ManualPortfolio) error
 }
 
 type postgresManualPortfolioRepo struct {
@@ -64,36 +65,14 @@ func (r *postgresManualPortfolioRepo) GetManualPortfolio(userID uint, portfolioN
 	return &portfolio, nil
 }
 
-func (r *postgresManualPortfolioRepo) DeleteManualPortfolio(userID uint, portfolioName string) error {
-	portfolio, err := r.GetManualPortfolio(userID, portfolioName)
-	if err != nil {
-		return err
+func (r *postgresManualPortfolioRepo) UpdateManualPortfolioName(portfolio *models.ManualPortfolio, newName string) error {
+	if portfolio == nil {
+		return commons.ErrNil
 	}
-	tx := r.db.Begin()
-
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	for _, asset := range portfolio.Assets {
-		if err := tx.Delete(&asset).Error; err != nil {
-			tx.Rollback()
-			return fmt.Errorf("failed to delete asset %s: %w", asset.Symbol, err)
-		}
+	portfolio.Name = newName
+	if err := r.db.Save(&portfolio).Error; err != nil {
+		return fmt.Errorf("failed to update portfolio name: %w", err)
 	}
-
-	if err := tx.Delete(&portfolio).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to delete portfolio: %w", err)
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
 	return nil
 }
 
@@ -124,5 +103,35 @@ func (r *postgresManualPortfolioRepo) UpdateManualPortfolio(portfolio *models.Ma
 		tx.Rollback()
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
+	return nil
+}
+
+func (r *postgresManualPortfolioRepo) DeleteManualPortfolio(portfolio *models.ManualPortfolio) error {
+
+	tx := r.db.Begin()
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	for _, asset := range portfolio.Assets {
+		if err := tx.Delete(&asset).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to delete asset %s: %w", asset.Symbol, err)
+		}
+	}
+
+	if err := tx.Delete(&portfolio).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete portfolio: %w", err)
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
 	return nil
 }

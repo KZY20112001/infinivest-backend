@@ -18,11 +18,11 @@ type RoboPortfolioService interface {
 	ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error
 	GetRoboPortfolioDetails(userID uint) (*models.RoboPortfolio, error)
 	GetRoboPortfolioSummary(userID uint) (dto.RoboPortfolioSummaryResponse, error)
-	DeleteRoboPortfolio(userID uint) error
 	AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.RoboPortfolio, error)
 	WithDrawMoneyFromRoboPortfolio(ctx context.Context, userID uint, amount float64) (float64, error)
 	UpdateRebalanceFreq(ctx context.Context, userID uint, freq string) error
 	RebalancePortfolio(userID, portfolioID uint) (*models.RoboPortfolio, error)
+	DeleteRoboPortfolio(ctx context.Context, userID uint) error
 }
 
 type roboPortfolioServiceImpl struct {
@@ -92,17 +92,13 @@ func (s *roboPortfolioServiceImpl) GetRoboPortfolioSummary(userID uint) (dto.Rob
 	if err != nil {
 		return dto.RoboPortfolioSummaryResponse{}, err
 	}
-	latestPrices := make(map[string]float64)
-	totalValue, err := s.getPortfolioValue(portfolio, latestPrices)
+	totalValue, err := s.getPortfolioValue(portfolio, make(map[string]float64))
 	if err != nil {
 		return dto.RoboPortfolioSummaryResponse{}, err
 	}
 	return dto.RoboPortfolioSummaryResponse{
 		RebalanceFreq: *portfolio.RebalanceFreq,
-		TotalValue:    totalValue, LatestAssetPrices: latestPrices}, nil
-}
-func (s *roboPortfolioServiceImpl) DeleteRoboPortfolio(userID uint) error {
-	return s.repo.DeleteRoboPortfolio(userID)
+		TotalValue:    totalValue}, nil
 }
 
 func (s *roboPortfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.RoboPortfolio, error) {
@@ -235,6 +231,24 @@ func (s *roboPortfolioServiceImpl) UpdateRebalanceFreq(ctx context.Context, user
 		return err
 	}
 	return s.cache.AddPortfolioToRebalancingQueue(ctx, userID, portfolio.ID, nextRebalanceTime)
+}
+func (s *roboPortfolioServiceImpl) DeleteRoboPortfolio(ctx context.Context, userID uint) error {
+	portfolio, err := s.repo.GetRoboPortfolioDetails(userID)
+	if err != nil {
+		return err
+	}
+
+	totalValue, err := s.getPortfolioValue(portfolio, make(map[string]float64))
+	if err != nil {
+		return err
+	}
+	if totalValue > 0 {
+		return fmt.Errorf("portfolio %d for user %d has a total value of %.2f. Please withdraw all funds before deleting", portfolio.ID, userID, totalValue)
+	}
+	if err := s.cache.DeletePortfolioFromQueue(ctx, userID, portfolio.ID); err != nil {
+		return err
+	}
+	return s.repo.DeleteRoboPortfolio(portfolio)
 }
 
 func (s *roboPortfolioServiceImpl) addMoneyToPortfolio(portfolio *models.RoboPortfolio, amount float64) error {

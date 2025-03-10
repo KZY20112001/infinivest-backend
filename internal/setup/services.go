@@ -35,7 +35,7 @@ func Services(
 	)
 
 	manualPortfolioService := services.NewManualPortfolioService(
-		manualPortfolioRepo,
+		manualPortfolioRepo, genAIService,
 	)
 
 	return userService, profileService, roboPortfolioService, manualPortfolioService, s3Service, genAIService
