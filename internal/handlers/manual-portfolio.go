@@ -17,14 +17,25 @@ func NewManualPortfolioHandler(ps services.ManualPortfolioService) *ManualPortfo
 	return &ManualPortfolioHandler{service: ps}
 }
 
-func (h *ManualPortfolioHandler) GetManualPortfolios(c *gin.Context) {
+func (h *ManualPortfolioHandler) GetManualPortfoliosDetails(c *gin.Context) {
 	userID := c.GetUint("id")
-	portfolios, err := h.service.GetManualPortfolios(userID)
+	portfolios, err := h.service.GetManualPortfoliosDetails(userID)
 	if err != nil {
 		commons.HandleError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"portfolios": portfolios})
+}
+
+func (h *ManualPortfolioHandler) GetManualPortfoliosSummaries(c *gin.Context) {
+	userID := c.GetUint("id")
+	portfolios, err := h.service.GetManualPortfoliosSummaries(userID)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"portfolios": portfolios})
+
 }
 
 func (h *ManualPortfolioHandler) GetManualPortfolio(c *gin.Context) {

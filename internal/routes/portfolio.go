@@ -12,7 +12,7 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 
 	roboAdvisorGroup := portfolioGroup.Group("/robo-portfolio")
 	{
-		roboAdvisorGroup.GET("/details", rh.GetRoboPortfolio)
+		roboAdvisorGroup.GET("/details", rh.GetRoboPortfolioDetails)
 		roboAdvisorGroup.GET("/summary", rh.GetRoboPortfolioSummary)
 
 		// TODO: Get transactions
@@ -33,7 +33,8 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 
 	manualGroup := portfolioGroup.Group("/manual-portfolio")
 	{
-		manualGroup.GET("/", mh.GetManualPortfolios)
+		manualGroup.GET("/details", mh.GetManualPortfoliosDetails)
+		manualGroup.GET("/summaries", mh.GetManualPortfoliosSummaries)
 		manualGroup.GET("/:name", mh.GetManualPortfolio)
 		manualGroup.GET("/:name/value", mh.GetPortfolioValue)
 

@@ -83,7 +83,7 @@ func (h *RoboPortfolioHandler) ConfirmGeneratedRoboPortfolio(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully created the portfolio"})
 }
 
-func (h *RoboPortfolioHandler) GetRoboPortfolio(c *gin.Context) {
+func (h *RoboPortfolioHandler) GetRoboPortfolioDetails(c *gin.Context) {
 	userID := c.GetUint("id")
 	portfolio, err := h.service.GetRoboPortfolioDetails(userID)
 	if err != nil {
