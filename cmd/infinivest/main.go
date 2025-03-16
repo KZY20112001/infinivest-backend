@@ -35,7 +35,7 @@ func init() {
 	if err != nil {
 		log.Fatalf("error in connecting to database: %v", err.Error())
 	}
-	postgresDB.AutoMigrate(&models.User{}, &models.Profile{}, &models.RoboPortfolio{}, &models.RoboPortfolioCategory{}, &models.RoboPortfolioAsset{})
+	postgresDB.AutoMigrate(&models.User{}, &models.Profile{}, &models.RoboPortfolio{}, &models.RoboPortfolioCategory{}, &models.RoboPortfolioAsset{}, &models.ManualPortfolio{}, &models.ManualPortfolioAsset{})
 
 	redisClient, err = db.ConnectToRedis()
 	if err != nil {
@@ -57,7 +57,7 @@ func main() {
 	presignClient := s3.NewPresignClient(s3Client)
 
 	// init repositories
-	userRepo, profileRepo, roboPortfolioRepo, s3Repo, genAIRepo := setup.Repositories(
+	userRepo, profileRepo, roboPortfolioRepo, manualPortfolioRepo, s3Repo, genAIRepo := setup.Repositories(
 		postgresDB, presignClient, appConf.FlaskMicroserviceURL,
 	)
 
@@ -66,7 +66,7 @@ func main() {
 
 	// init services
 	userService, profileService, roboPortfolioService, manualPortfolioService, s3Service, genAIService := setup.Services(
-		portfolioCache, userRepo, profileRepo, roboPortfolioRepo, s3Repo, genAIRepo,
+		portfolioCache, userRepo, profileRepo, roboPortfolioRepo, manualPortfolioRepo, s3Repo, genAIRepo,
 	)
 
 	// init handlers

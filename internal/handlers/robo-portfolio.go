@@ -21,6 +21,11 @@ func NewRoboPortfolioHandler(ps services.RoboPortfolioService, gs services.GenAI
 
 func (h *RoboPortfolioHandler) GenerateRoboAdvisorPortfolio(c *gin.Context) {
 	bankName := c.PostForm("bank_name")
+	if bankName == "" {
+		commons.HandleError(c, fmt.Errorf("bank name is required"))
+		return
+	}
+
 	riskToleranceLevel := c.PostForm("risk_tolerance_level")
 	if riskToleranceLevel == "" {
 		commons.HandleError(c, fmt.Errorf("risk tolerance level is required"))
@@ -28,6 +33,7 @@ func (h *RoboPortfolioHandler) GenerateRoboAdvisorPortfolio(c *gin.Context) {
 	}
 
 	bankStatement, err := c.FormFile("bank_statement")
+
 	if err != nil {
 		commons.HandleError(c, err)
 		return
@@ -77,9 +83,9 @@ func (h *RoboPortfolioHandler) ConfirmGeneratedRoboPortfolio(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully created the portfolio"})
 }
 
-func (h *RoboPortfolioHandler) GetRoboPortfolio(c *gin.Context) {
+func (h *RoboPortfolioHandler) GetRoboPortfolioDetails(c *gin.Context) {
 	userID := c.GetUint("id")
-	portfolio, err := h.service.GetRoboPortfolio(userID)
+	portfolio, err := h.service.GetRoboPortfolioDetails(userID)
 	if err != nil {
 		commons.HandleError(c, err)
 		return
@@ -87,14 +93,14 @@ func (h *RoboPortfolioHandler) GetRoboPortfolio(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"portfolio": portfolio})
 }
 
-func (h *RoboPortfolioHandler) DeleteRoboPortfolio(c *gin.Context) {
+func (h *RoboPortfolioHandler) GetRoboPortfolioSummary(c *gin.Context) {
 	userID := c.GetUint("id")
-	err := h.service.DeleteRoboPortfolio(userID)
+	summary, err := h.service.GetRoboPortfolioSummary(userID)
 	if err != nil {
 		commons.HandleError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Successfully deleted the portfolio"})
+	c.JSON(http.StatusOK, gin.H{"summary": summary})
 }
 
 func (h *RoboPortfolioHandler) AddMoneyToRoboPortfolio(c *gin.Context) {
@@ -145,4 +151,14 @@ func (h *RoboPortfolioHandler) UpdateRebalanceFreq(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully updated the rebalance frequency"})
+}
+
+func (h *RoboPortfolioHandler) DeleteRoboPortfolio(c *gin.Context) {
+	userID := c.GetUint("id")
+	err := h.service.DeleteRoboPortfolio(c.Request.Context(), userID)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully deleted the portfolio"})
 }

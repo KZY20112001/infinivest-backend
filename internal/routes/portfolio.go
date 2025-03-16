@@ -10,22 +10,46 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 	portfolioGroup := r.Group("/portfolio")
 	portfolioGroup.Use(middlewares.AuthMiddleware())
 
-	roboAdvisorGroup := portfolioGroup.Group("/robo-advisor")
+	roboAdvisorGroup := portfolioGroup.Group("/robo-portfolio")
 	{
+		roboAdvisorGroup.GET("/details", rh.GetRoboPortfolioDetails)
+		roboAdvisorGroup.GET("/summary", rh.GetRoboPortfolioSummary)
+
+		// TODO: Get transactions
+		roboAdvisorGroup.GET("/transactions")
+
 		roboAdvisorGroup.POST("/generate/categories", rh.GenerateRoboAdvisorPortfolio)
 		roboAdvisorGroup.POST("/generate/assets", rh.GenerateAssetAllocation)
 		roboAdvisorGroup.POST("/confirm", rh.ConfirmGeneratedRoboPortfolio)
-		roboAdvisorGroup.GET("/", rh.GetRoboPortfolio)
 		roboAdvisorGroup.POST("/add", rh.AddMoneyToRoboPortfolio)
 		roboAdvisorGroup.POST("/withdraw", rh.WithDrawMoneyFromRoboPortfolio)
 		roboAdvisorGroup.PUT("/rebalance-freq", rh.UpdateRebalanceFreq)
+
+		// TODO: Update robo portfolio
+		roboAdvisorGroup.PUT("/update")
+
 		roboAdvisorGroup.DELETE("/", rh.DeleteRoboPortfolio)
 	}
 
-	manualGroup := portfolioGroup.Group("/manual")
+	manualGroup := portfolioGroup.Group("/manual-portfolio")
 	{
-		manualGroup.POST("/")
-		manualGroup.PATCH("/")
-		manualGroup.GET("/", mh.GetManualPortfolios)
+		manualGroup.GET("/details", mh.GetManualPortfoliosDetails)
+		manualGroup.GET("/summaries", mh.GetManualPortfoliosSummaries)
+		manualGroup.GET("/:name", mh.GetManualPortfolio)
+		manualGroup.GET("/:name/value", mh.GetPortfolioValue)
+
+		manualGroup.POST("/", mh.CreateManualPortfolio)
+		manualGroup.POST("/:name/add", mh.AddMoneyToManualPortfolio)
+		manualGroup.POST("/:name/withdraw", mh.WithDrawMoneyFromManualPortfolio)
+
+		manualGroup.PUT("/:name", mh.UpdatePortfolioName)
+		manualGroup.DELETE("/:name", mh.DeleteManualPortfolio)
+
+		manualGroup.PUT("/:name/buy", mh.BuyAssetForManualPortfolio)
+		manualGroup.PUT("/:name/sell", mh.SellAssetForManualPortfolio)
+
+		//TODO: get transactions
+		manualGroup.GET("/:name/transactions")
+
 	}
 }

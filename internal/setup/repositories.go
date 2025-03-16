@@ -14,12 +14,14 @@ func Repositories(
 	repositories.UserRepo,
 	repositories.ProfileRepo,
 	repositories.RoboPortfolioRepo,
+	repositories.ManualPortfolioRepo,
 	repositories.S3Repository,
 	repositories.GenAIRepository,
 ) {
 	return repositories.NewPostgresUserRepo(db),
 		repositories.NewPostgresProfileRepo(db),
 		repositories.NewPostgresRoboPortfolioRepo(db),
+		repositories.NewPostgresManualPortfolioRepo(db),
 		repositories.NewS3RepositoryImpl(s3Client),
 		repositories.NewFlaskMicroservice(genAIUrl)
 }

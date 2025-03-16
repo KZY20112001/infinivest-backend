@@ -10,7 +10,8 @@ func Services(
 	portfolioCache caches.RoboPortfolioCache,
 	userRepo repositories.UserRepo,
 	profileRepo repositories.ProfileRepo,
-	portfolioRepo repositories.RoboPortfolioRepo,
+	roboPortfolioRepo repositories.RoboPortfolioRepo,
+	manualPortfolioRepo repositories.ManualPortfolioRepo,
 	s3Repo repositories.S3Repository,
 	genAIRepo repositories.GenAIRepository,
 ) (
@@ -30,11 +31,11 @@ func Services(
 	genAIService := services.NewGenAIService(genAIRepo)
 
 	roboPortfolioService := services.NewRoboPortfolioService(
-		portfolioRepo, portfolioCache, profileService, genAIService,
+		roboPortfolioRepo, portfolioCache, genAIService,
 	)
 
 	manualPortfolioService := services.NewManualPortfolioService(
-		portfolioRepo, portfolioCache, profileService,
+		manualPortfolioRepo, genAIService,
 	)
 
 	return userService, profileService, roboPortfolioService, manualPortfolioService, s3Service, genAIService
