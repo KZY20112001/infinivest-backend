@@ -14,9 +14,9 @@ type ManualPortfolioAsset struct {
 	gorm.Model
 	ManualPortfolioID     uint
 	ManualPortfolioUserID uint
-	Symbol                string `json:"symbol"`
-
-	SharesOwned   float64 `json:"sharesOwned"`
-	TotalInvested float64 `json:"totalInvested"`
-	AvgBuyPrice   float64 `json:"avgBuyPrice"`
+	Symbol                string  `json:"symbol"`
+	Name                  string  `json:"name"`
+	SharesOwned           float64 `json:"sharesOwned"`
+	TotalInvested         float64 `json:"totalInvested"`
+	AvgBuyPrice           float64 `json:"avgBuyPrice"`
 }

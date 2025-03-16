@@ -121,15 +121,14 @@ func (h *ManualPortfolioHandler) WithDrawMoneyFromManualPortfolio(c *gin.Context
 }
 
 func (h *ManualPortfolioHandler) BuyAssetForManualPortfolio(c *gin.Context) {
-	var req dto.ManualPortfolioAssetRequest
+	var req dto.ManualPortfolioBuyAssetRequest
 	userID := c.GetUint("id")
 	portfolioName := c.Param("name")
-	symbol := c.Param("symbol")
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := h.service.BuyAssetForManualPortfolio(userID, portfolioName, symbol, req.SharesAmount); err != nil {
+	if err := h.service.BuyAssetForManualPortfolio(userID, portfolioName, req.Name, req.Symbol, req.SharesAmount); err != nil {
 		commons.HandleError(c, err)
 		return
 	}
@@ -137,15 +136,14 @@ func (h *ManualPortfolioHandler) BuyAssetForManualPortfolio(c *gin.Context) {
 }
 
 func (h *ManualPortfolioHandler) SellAssetForManualPortfolio(c *gin.Context) {
-	var req dto.ManualPortfolioAssetRequest
+	var req dto.ManualPortfolioSellAssetRequest
 	userID := c.GetUint("id")
 	portfolioName := c.Param("name")
-	symbol := c.Param("symbol")
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := h.service.SellAssetForManualPortfolio(userID, portfolioName, symbol, req.SharesAmount); err != nil {
+	if err := h.service.SellAssetForManualPortfolio(userID, portfolioName, req.Symbol, req.SharesAmount); err != nil {
 		commons.HandleError(c, err)
 		return
 	}

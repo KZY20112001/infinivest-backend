@@ -45,8 +45,8 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 		manualGroup.PUT("/:name", mh.UpdatePortfolioName)
 		manualGroup.DELETE("/:name", mh.DeleteManualPortfolio)
 
-		manualGroup.PUT("/:name/:symbol/buy")
-		manualGroup.PUT("/:name/:symbol/sell")
+		manualGroup.PUT("/:name/buy", mh.BuyAssetForManualPortfolio)
+		manualGroup.PUT("/:name/sell", mh.SellAssetForManualPortfolio)
 
 		//TODO: get transactions
 		manualGroup.GET("/:name/transactions")

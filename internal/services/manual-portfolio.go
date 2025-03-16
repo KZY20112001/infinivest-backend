@@ -22,7 +22,7 @@ type ManualPortfolioService interface {
 	AddMoneyToManualPortfolio(userID uint, portfolioName string, amount float64) error
 	WithdrawMoneyFromManualPortfolio(userID uint, portfolioName string, amount float64) (float64, error)
 
-	BuyAssetForManualPortfolio(userID uint, portfolioName, symbol string, shares float64) error
+	BuyAssetForManualPortfolio(userID uint, portfolioName, name, symbol string, shares float64) error
 	SellAssetForManualPortfolio(userID uint, portfolioName, symbol string, shares float64) error
 
 	DeleteManualPortfolio(userID uint, portfolioName string) error
@@ -149,7 +149,7 @@ func (s *manualPortfolioServiceImpl) WithdrawMoneyFromManualPortfolio(userID uin
 	return originalAmount - amount, nil
 }
 
-func (s *manualPortfolioServiceImpl) BuyAssetForManualPortfolio(userID uint, portfolioName, symbol string, shares float64) error {
+func (s *manualPortfolioServiceImpl) BuyAssetForManualPortfolio(userID uint, portfolioName, name, symbol string, shares float64) error {
 	portfolio, err := s.repo.GetManualPortfolio(userID, portfolioName)
 	if err != nil {
 		return err
@@ -177,6 +177,7 @@ func (s *manualPortfolioServiceImpl) BuyAssetForManualPortfolio(userID uint, por
 	if !found {
 		curAsset = &models.ManualPortfolioAsset{
 			Symbol:        symbol,
+			Name:          name,
 			SharesOwned:   shares,
 			TotalInvested: totalCost,
 			AvgBuyPrice:   latestValue,
@@ -188,7 +189,7 @@ func (s *manualPortfolioServiceImpl) BuyAssetForManualPortfolio(userID uint, por
 		curAsset.AvgBuyPrice = curAsset.TotalInvested / curAsset.SharesOwned
 	}
 	portfolio.TotalCash -= totalCost
-
+	fmt.Println(portfolio)
 	return s.repo.UpdateManualPortfolio(portfolio)
 }
 
@@ -227,12 +228,12 @@ func (s *manualPortfolioServiceImpl) DeleteManualPortfolio(userID uint, portfoli
 	if err != nil {
 		return err
 	}
-	totalValue, err := s.GetPorfolioValue(userID, portfolioName)
-	if err != nil {
-		return err
-	}
-	if totalValue > 0 {
-		return fmt.Errorf("%s portfolio has assets and liquid cash. Sell all assets and withdraw the money before deleting the portfolio", portfolioName)
-	}
+	// totalValue, err := s.GetPorfolioValue(userID, portfolioName)
+	// if err != nil {
+	// 	return err
+	// }
+	// if totalValue > 0 {
+	// 	return fmt.Errorf("%s portfolio has assets and liquid cash. Sell all assets and withdraw the money before deleting the portfolio", portfolioName)
+	// }
 	return s.repo.DeleteManualPortfolio(portfolio)
 }

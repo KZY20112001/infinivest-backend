@@ -60,7 +60,14 @@ type ManualPortfolioRequest struct {
 	Name string `json:"name"`
 }
 
-type ManualPortfolioAssetRequest struct {
+type ManualPortfolioBuyAssetRequest struct {
+	Symbol       string  `json:"symbol"`
+	Name         string  `json:"name"`
+	SharesAmount float64 `json:"sharesAmount"`
+}
+
+type ManualPortfolioSellAssetRequest struct {
+	Symbol       string  `json:"symbol"`
 	SharesAmount float64 `json:"sharesAmount"`
 }
 
