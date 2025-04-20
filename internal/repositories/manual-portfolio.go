@@ -18,7 +18,7 @@ type ManualPortfolioRepo interface {
 	DeleteManualPortfolio(portfolio *models.ManualPortfolio) error
 
 	CreateManualPortfolioTransaction(transaction *models.ManualPortfolioTransaction) error
-	GetManualPortfolioTransactions(userID, portfolioID uint) ([]*models.ManualPortfolioTransaction, error)
+	GetManualPortfolioTransactions(userID, portfolioID uint, limit int) ([]*models.ManualPortfolioTransaction, error)
 }
 
 type postgresManualPortfolioRepo struct {
@@ -153,9 +153,16 @@ func (r *postgresManualPortfolioRepo) CreateManualPortfolioTransaction(transacti
 	return nil
 }
 
-func (r *postgresManualPortfolioRepo) GetManualPortfolioTransactions(userID, portfolioID uint) ([]*models.ManualPortfolioTransaction, error) {
+func (r *postgresManualPortfolioRepo) GetManualPortfolioTransactions(userID, portfolioID uint, limit int) ([]*models.ManualPortfolioTransaction, error) {
 	var transactions []*models.ManualPortfolioTransaction
-	if err := r.db.Where("manual_portfolio_user_id = ? AND manual_portfolio_id = ?", userID, portfolioID).Find(&transactions).Error; err != nil {
+
+	query := r.db.Where("manual_portfolio_user_id = ? AND manual_portfolio_id = ?", userID, portfolioID)
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	if err := query.Find(&transactions).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, gorm.ErrRecordNotFound
 		}

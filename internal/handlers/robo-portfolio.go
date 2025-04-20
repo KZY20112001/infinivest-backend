@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/KZY20112001/infinivest-backend/internal/commons"
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
@@ -160,4 +161,25 @@ func (h *RoboPortfolioHandler) DeleteRoboPortfolio(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully deleted the portfolio"})
+}
+
+func (h *RoboPortfolioHandler) GetRoboPortfolioTransactions(c *gin.Context) {
+	userID := c.GetUint("id")
+	limitStr := c.Query("limit")
+
+	limit := 0
+	if limitStr != "" {
+		parsedLimit, err := strconv.Atoi(limitStr)
+		if err != nil || parsedLimit <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit parameter"})
+			return
+		}
+		limit = parsedLimit
+	}
+	transactions, err := h.service.GetRoboPortfolioTransactions(userID, limit)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"transactions": transactions})
 }

@@ -17,7 +17,7 @@ type RoboPortfolioRepo interface {
 	DeleteRoboPortfolio(portfolio *models.RoboPortfolio) error
 
 	CreateRoboPortfolioTransaction(transaction *models.RoboPortfolioTransaction) error
-	GetRoboPortfolioTransactionDetails(userID uint) ([]*models.RoboPortfolioTransaction, error)
+	GetRoboPortfolioTransactions(userID uint, limit int) ([]*models.RoboPortfolioTransaction, error)
 }
 
 type postgresRoboPortfolioRepo struct {
@@ -169,10 +169,15 @@ func (r *postgresRoboPortfolioRepo) CreateRoboPortfolioTransaction(transaction *
 	return nil
 }
 
-func (r *postgresRoboPortfolioRepo) GetRoboPortfolioTransactionDetails(userID uint) ([]*models.RoboPortfolioTransaction, error) {
+func (r *postgresRoboPortfolioRepo) GetRoboPortfolioTransactions(userID uint, limit int) ([]*models.RoboPortfolioTransaction, error) {
 	var transactions []*models.RoboPortfolioTransaction
-	err := r.db.Joins("JOIN robo_portfolios ON robo_portfolio_transactions.robo_portfolio_id = robo_portfolios.id").
-		Where("robo_portfolios.user_id = ?", userID).
-		Find(&transactions).Error
+	query := r.db.Joins("JOIN robo_portfolios ON robo_portfolio_transactions.robo_portfolio_id = robo_portfolios.id").
+		Where("robo_portfolios.user_id = ?", userID)
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Order("robo_portfolio_transactions.created_at DESC").Find(&transactions).Error
 	return transactions, err
 }

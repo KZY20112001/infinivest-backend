@@ -26,6 +26,7 @@ type ManualPortfolioService interface {
 	SellAssetForManualPortfolio(userID uint, portfolioName, symbol string, shares float64) error
 
 	DeleteManualPortfolio(userID uint, portfolioName string) error
+	GetManualPortfolioTransactions(userID uint, portfolioName string, limit int) ([]*models.ManualPortfolioTransaction, error)
 }
 
 type manualPortfolioServiceImpl struct {
@@ -307,4 +308,12 @@ func (s *manualPortfolioServiceImpl) DeleteManualPortfolio(userID uint, portfoli
 		return fmt.Errorf("%s portfolio has assets and liquid cash. Sell all assets and withdraw the money before deleting the portfolio", portfolioName)
 	}
 	return s.repo.DeleteManualPortfolio(portfolio)
+}
+
+func (s *manualPortfolioServiceImpl) GetManualPortfolioTransactions(userID uint, portfolioName string, limit int) ([]*models.ManualPortfolioTransaction, error) {
+	portfolio, err := s.repo.GetManualPortfolio(userID, portfolioName)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.GetManualPortfolioTransactions(userID, portfolio.ID, limit)
 }

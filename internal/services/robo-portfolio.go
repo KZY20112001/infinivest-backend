@@ -23,6 +23,8 @@ type RoboPortfolioService interface {
 	UpdateRebalanceFreq(ctx context.Context, userID uint, freq string) error
 	RebalancePortfolio(userID, portfolioID uint) (*models.RoboPortfolio, error)
 	DeleteRoboPortfolio(ctx context.Context, userID uint) error
+
+	GetRoboPortfolioTransactions(userID uint, limit int) ([]*models.RoboPortfolioTransaction, error)
 }
 
 type roboPortfolioServiceImpl struct {
@@ -274,47 +276,6 @@ func (s *roboPortfolioServiceImpl) DeleteRoboPortfolio(ctx context.Context, user
 	return s.repo.DeleteRoboPortfolio(portfolio)
 }
 
-func (s *roboPortfolioServiceImpl) addMoneyToPortfolio(portfolio *models.RoboPortfolio, amount float64) error {
-	var wg sync.WaitGroup
-	for _, category := range portfolio.Categories {
-		categoryTotal := amount * category.TotalPercentage / 100
-		category.TotalAmount += categoryTotal
-		if category.Name == "cash" || category.TotalPercentage == 0 {
-			continue
-		}
-		errCh := make(chan error, len(category.Assets))
-		for _, asset := range category.Assets {
-			wg.Add(1)
-			go func(asset *models.RoboPortfolioAsset, assetAmount float64) {
-				defer wg.Done()
-
-				latestPrice, err := s.genAIService.GetLatestAssetPrice(asset.Symbol)
-				if err != nil {
-					errCh <- fmt.Errorf("failed to get latest price for asset %s: %w", asset.Symbol, err)
-					return
-				}
-
-				asset.SharesOwned += assetAmount / latestPrice
-				asset.TotalInvested += assetAmount
-				if asset.SharesOwned > 0 {
-					asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
-				}
-			}(asset, amount*asset.Percentage/100)
-		}
-		wg.Wait()
-		close(errCh)
-		for err := range errCh {
-			return err
-		}
-	}
-
-	// save the updated portfolio
-	if err := s.repo.UpdateRoboPortfolio(portfolio); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s *roboPortfolioServiceImpl) RebalancePortfolio(userID, portfolioID uint) (*models.RoboPortfolio, error) {
 	log.Println("Rebalancing portfolio", portfolioID, "for user", userID)
 	portfolio, err := s.repo.GetRoboPortfolioDetails(userID)
@@ -389,6 +350,51 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(userID, portfolioID uint) 
 	log.Println("Rebalanced portfolio:", portfolioID, "for user", userID)
 
 	return portfolio, nil
+}
+
+func (s *roboPortfolioServiceImpl) GetRoboPortfolioTransactions(userID uint, limit int) ([]*models.RoboPortfolioTransaction, error) {
+	return s.repo.GetRoboPortfolioTransactions(userID, limit)
+}
+
+func (s *roboPortfolioServiceImpl) addMoneyToPortfolio(portfolio *models.RoboPortfolio, amount float64) error {
+	var wg sync.WaitGroup
+	for _, category := range portfolio.Categories {
+		categoryTotal := amount * category.TotalPercentage / 100
+		category.TotalAmount += categoryTotal
+		if category.Name == "cash" || category.TotalPercentage == 0 {
+			continue
+		}
+		errCh := make(chan error, len(category.Assets))
+		for _, asset := range category.Assets {
+			wg.Add(1)
+			go func(asset *models.RoboPortfolioAsset, assetAmount float64) {
+				defer wg.Done()
+
+				latestPrice, err := s.genAIService.GetLatestAssetPrice(asset.Symbol)
+				if err != nil {
+					errCh <- fmt.Errorf("failed to get latest price for asset %s: %w", asset.Symbol, err)
+					return
+				}
+
+				asset.SharesOwned += assetAmount / latestPrice
+				asset.TotalInvested += assetAmount
+				if asset.SharesOwned > 0 {
+					asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
+				}
+			}(asset, amount*asset.Percentage/100)
+		}
+		wg.Wait()
+		close(errCh)
+		for err := range errCh {
+			return err
+		}
+	}
+
+	// save the updated portfolio
+	if err := s.repo.UpdateRoboPortfolio(portfolio); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *roboPortfolioServiceImpl) getPortfolioValue(portfolio *models.RoboPortfolio, latestAssetPrices map[string]float64) (float64, error) {

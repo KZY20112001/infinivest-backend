@@ -15,8 +15,7 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 		roboAdvisorGroup.GET("/details", rh.GetRoboPortfolioDetails)
 		roboAdvisorGroup.GET("/summary", rh.GetRoboPortfolioSummary)
 
-		// TODO: Get transactions
-		roboAdvisorGroup.GET("/transactions")
+		roboAdvisorGroup.GET("/transactions", rh.GetRoboPortfolioTransactions)
 
 		roboAdvisorGroup.POST("/generate/categories", rh.GenerateRoboAdvisorPortfolio)
 		roboAdvisorGroup.POST("/generate/assets", rh.GenerateAssetAllocation)
@@ -48,8 +47,7 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 		manualGroup.PUT("/:name/buy", mh.BuyAssetForManualPortfolio)
 		manualGroup.PUT("/:name/sell", mh.SellAssetForManualPortfolio)
 
-		//TODO: get transactions
-		manualGroup.GET("/:name/transactions")
+		manualGroup.GET("/:name/transactions", mh.GetManualPortfolioTransactions)
 
 	}
 }

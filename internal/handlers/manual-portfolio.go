@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/KZY20112001/infinivest-backend/internal/commons"
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
@@ -159,4 +160,26 @@ func (h *ManualPortfolioHandler) DeleteManualPortfolio(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Portfolio deleted successfully"})
 
+}
+
+func (h *ManualPortfolioHandler) GetManualPortfolioTransactions(c *gin.Context) {
+	portfolioName := c.Param("name")
+	userID := c.GetUint("id")
+
+	limitStr := c.Query("limit")
+	limit := 0
+	if limitStr != "" {
+		parsedLimit, err := strconv.Atoi(limitStr)
+		if err != nil || parsedLimit <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit parameter"})
+			return
+		}
+		limit = parsedLimit
+	}
+	transactions, err := h.service.GetManualPortfolioTransactions(userID, portfolioName, limit)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"transactions": transactions})
 }
