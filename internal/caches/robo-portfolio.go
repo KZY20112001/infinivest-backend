@@ -68,6 +68,7 @@ func (r *roboPortfolioRedis) DeletePortfolioFromQueue(ctx context.Context, userI
 }
 
 func (r *roboPortfolioRedis) GetDuePortfolios(ctx context.Context) ([]string, error) {
+
 	key := "rebalancing_queue"
 	now := float64(time.Now().Unix())
 
@@ -82,7 +83,7 @@ func (r *roboPortfolioRedis) GetDuePortfolios(ctx context.Context) ([]string, er
 	if len(results) == 0 {
 		return nil, fmt.Errorf("no portfolios due for rebalancing")
 	}
-
+	fmt.Println("Due portfolios:", results)
 	var portfolios []string
 	for _, result := range results {
 		member := result.Member.(string) // userID:portfolioID

@@ -111,6 +111,16 @@ func (s *roboPortfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, 
 		return nil, err
 	}
 
+	err = s.repo.CreateRoboPortfolioTransaction(&models.RoboPortfolioTransaction{
+		RoboPortfolioID: portfolio.ID,
+		TransactionType: "deposit",
+		TotalAmount:     amount,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
 	// check if current portfolio is in queue
 	if _, err := s.cache.GetNextRebalanceTime(ctx, userID, portfolio.ID); err == nil {
 		return portfolio, nil
@@ -125,7 +135,8 @@ func (s *roboPortfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, 
 	if err = s.cache.AddPortfolioToRebalancingQueue(ctx, userID, portfolio.ID, nextRebalanceTime); err != nil {
 		return nil, err
 	}
-	return portfolio, err
+
+	return portfolio, nil
 }
 
 func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Context, userID uint, amount float64) (float64, error) {
@@ -202,6 +213,17 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 	if err := s.repo.UpdateRoboPortfolio(portfolio); err != nil {
 		return 0, err
 	}
+
+	err = s.repo.CreateRoboPortfolioTransaction(&models.RoboPortfolioTransaction{
+		RoboPortfolioID: portfolio.ID,
+		TransactionType: "withdrawal",
+		TotalAmount:     originalAmount - amount,
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
 	return originalAmount - amount, nil
 }
 
@@ -232,6 +254,7 @@ func (s *roboPortfolioServiceImpl) UpdateRebalanceFreq(ctx context.Context, user
 	}
 	return s.cache.AddPortfolioToRebalancingQueue(ctx, userID, portfolio.ID, nextRebalanceTime)
 }
+
 func (s *roboPortfolioServiceImpl) DeleteRoboPortfolio(ctx context.Context, userID uint) error {
 	portfolio, err := s.repo.GetRoboPortfolioDetails(userID)
 	if err != nil {
@@ -443,6 +466,22 @@ func (s *roboPortfolioServiceImpl) sellOverPerformingAssets(portfolioCategories 
 			if asset.SharesOwned > 0 {
 				asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
 			}
+
+			err := s.repo.CreateRoboPortfolioTransaction(&models.RoboPortfolioTransaction{
+				RoboPortfolioID:      asset.RoboPortfolioCategoryID,
+				AutoRebalanceEventID: nil,
+				TransactionType:      "sell",
+
+				TotalAmount:  amountToSell,
+				Symbol:       &asset.Symbol,
+				Name:         &asset.Name,
+				Price:        &latestPrice,
+				SharesAmount: &sharesToSell,
+			})
+
+			if err != nil {
+				log.Println("Error creating transaction when selling a new asset for rebalancing:", err)
+			}
 		}(asset)
 	}
 	wg.Wait()
@@ -474,6 +513,7 @@ func (s *roboPortfolioServiceImpl) buyUnderPerformingAssets(portfolioCategories 
 			amountToBuy := targetValue - curValue
 
 			mu.Lock()
+
 			if amountToBuy > *totalCash {
 				amountToBuy = *totalCash
 			}
@@ -489,6 +529,23 @@ func (s *roboPortfolioServiceImpl) buyUnderPerformingAssets(portfolioCategories 
 			if asset.SharesOwned > 0 {
 				asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
 			}
+
+			err := s.repo.CreateRoboPortfolioTransaction(&models.RoboPortfolioTransaction{
+				RoboPortfolioID:      asset.RoboPortfolioCategoryID,
+				AutoRebalanceEventID: nil,
+				TransactionType:      "buy",
+
+				TotalAmount:  amountToBuy,
+				Symbol:       &asset.Symbol,
+				Name:         &asset.Name,
+				Price:        &latestPrice,
+				SharesAmount: &sharesToBuy,
+			})
+
+			if err != nil {
+				log.Println("Error creating transaction when buying a new asset for rebalancing:", err)
+			}
+
 		}(asset)
 	}
 

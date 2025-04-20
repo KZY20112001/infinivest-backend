@@ -113,6 +113,14 @@ func (s *manualPortfolioServiceImpl) GetPorfolioValue(userID uint, portfolioName
 	return totalValue, nil
 }
 
+func (s *manualPortfolioServiceImpl) UpdatePortfolioName(userID uint, portfolioName, newName string) error {
+	portfolio, err := s.repo.GetManualPortfolio(userID, portfolioName)
+	if err != nil {
+		return err
+	}
+	return s.repo.UpdateManualPortfolioName(portfolio, newName)
+}
+
 func (s *manualPortfolioServiceImpl) AddMoneyToManualPortfolio(userID uint, portfolioName string, amount float64) error {
 	portfolio, err := s.repo.GetManualPortfolio(userID, portfolioName)
 	if err != nil {
@@ -120,15 +128,24 @@ func (s *manualPortfolioServiceImpl) AddMoneyToManualPortfolio(userID uint, port
 	}
 
 	portfolio.TotalCash += amount
-	return s.repo.UpdateManualPortfolio(portfolio)
-}
 
-func (s *manualPortfolioServiceImpl) UpdatePortfolioName(userID uint, portfolioName, newName string) error {
-	portfolio, err := s.repo.GetManualPortfolio(userID, portfolioName)
+	err = s.repo.UpdateManualPortfolio(portfolio)
 	if err != nil {
 		return err
 	}
-	return s.repo.UpdateManualPortfolioName(portfolio, newName)
+
+	err = s.repo.CreateManualPortfolioTransaction(&models.ManualPortfolioTransaction{
+		ManualPortfolioUserID: userID,
+		ManualPortfolioID:     portfolio.ID,
+		TransactionType:       "deposit",
+		TotalAmount:           amount,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 func (s *manualPortfolioServiceImpl) WithdrawMoneyFromManualPortfolio(userID uint, portfolioName string, amount float64) (float64, error) {
 	portfolio, err := s.repo.GetManualPortfolio(userID, portfolioName)
@@ -144,6 +161,17 @@ func (s *manualPortfolioServiceImpl) WithdrawMoneyFromManualPortfolio(userID uin
 		amount = 0
 	}
 	if err := s.repo.UpdateManualPortfolio(portfolio); err != nil {
+		return 0, err
+	}
+
+	err = s.repo.CreateManualPortfolioTransaction(&models.ManualPortfolioTransaction{
+		ManualPortfolioUserID: userID,
+		ManualPortfolioID:     portfolio.ID,
+		TransactionType:       "withdrawal",
+		TotalAmount:           originalAmount - amount,
+	})
+
+	if err != nil {
 		return 0, err
 	}
 	return originalAmount - amount, nil
@@ -189,8 +217,28 @@ func (s *manualPortfolioServiceImpl) BuyAssetForManualPortfolio(userID uint, por
 		curAsset.AvgBuyPrice = curAsset.TotalInvested / curAsset.SharesOwned
 	}
 	portfolio.TotalCash -= totalCost
-	fmt.Println(portfolio)
-	return s.repo.UpdateManualPortfolio(portfolio)
+
+	err = s.repo.UpdateManualPortfolio(portfolio)
+	if err != nil {
+		return err
+	}
+
+	err = s.repo.CreateManualPortfolioTransaction(&models.ManualPortfolioTransaction{
+		ManualPortfolioUserID: userID,
+		ManualPortfolioID:     portfolio.ID,
+		TransactionType:       "buy",
+		TotalAmount:           totalCost,
+
+		Symbol:       &symbol,
+		Name:         &name,
+		Price:        &latestValue,
+		SharesAmount: &shares,
+	})
+
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *manualPortfolioServiceImpl) SellAssetForManualPortfolio(userID uint, portfolioName, symbol string, shares float64) error {
@@ -218,9 +266,32 @@ func (s *manualPortfolioServiceImpl) SellAssetForManualPortfolio(userID uint, po
 	if err != nil {
 		return err
 	}
-	portfolio.TotalCash += latestValue * shares
+	totalCost := latestValue * shares
+	portfolio.TotalCash += totalCost
 	curAsset.SharesOwned -= shares
-	return s.repo.UpdateManualPortfolio(portfolio)
+
+	err = s.repo.UpdateManualPortfolio(portfolio)
+	if err != nil {
+		return err
+	}
+
+	err = s.repo.CreateManualPortfolioTransaction(&models.ManualPortfolioTransaction{
+		ManualPortfolioUserID: userID,
+		ManualPortfolioID:     portfolio.ID,
+		TransactionType:       "sell",
+		TotalAmount:           totalCost,
+
+		Symbol:       &symbol,
+		Name:         &curAsset.Name,
+		Price:        &latestValue,
+		SharesAmount: &shares,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *manualPortfolioServiceImpl) DeleteManualPortfolio(userID uint, portfolioName string) error {
@@ -228,12 +299,12 @@ func (s *manualPortfolioServiceImpl) DeleteManualPortfolio(userID uint, portfoli
 	if err != nil {
 		return err
 	}
-	// totalValue, err := s.GetPorfolioValue(userID, portfolioName)
-	// if err != nil {
-	// 	return err
-	// }
-	// if totalValue > 0 {
-	// 	return fmt.Errorf("%s portfolio has assets and liquid cash. Sell all assets and withdraw the money before deleting the portfolio", portfolioName)
-	// }
+	totalValue, err := s.GetPorfolioValue(userID, portfolioName)
+	if err != nil {
+		return err
+	}
+	if totalValue > 0 {
+		return fmt.Errorf("%s portfolio has assets and liquid cash. Sell all assets and withdraw the money before deleting the portfolio", portfolioName)
+	}
 	return s.repo.DeleteManualPortfolio(portfolio)
 }

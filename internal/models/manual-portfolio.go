@@ -13,8 +13,8 @@ type ManualPortfolio struct {
 
 type ManualPortfolioAsset struct {
 	gorm.Model
-	ManualPortfolioID     uint
-	ManualPortfolioUserID uint
+	ManualPortfolioID     uint    `gorm:"not null;index"`
+	ManualPortfolioUserID uint    `gorm:"not null;index"`
 	Symbol                string  `json:"symbol"`
 	Name                  string  `json:"name"`
 	SharesOwned           float64 `json:"sharesOwned"`

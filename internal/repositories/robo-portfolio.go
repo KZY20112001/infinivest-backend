@@ -15,6 +15,9 @@ type RoboPortfolioRepo interface {
 	UpdateRebalanceFreq(userID uint, freq string) error
 	UpdateRoboPortfolio(portfolio *models.RoboPortfolio) error
 	DeleteRoboPortfolio(portfolio *models.RoboPortfolio) error
+
+	CreateRoboPortfolioTransaction(transaction *models.RoboPortfolioTransaction) error
+	GetRoboPortfolioTransactionDetails(userID uint) ([]*models.RoboPortfolioTransaction, error)
 }
 
 type postgresRoboPortfolioRepo struct {
@@ -125,7 +128,7 @@ func (r *postgresRoboPortfolioRepo) DeleteRoboPortfolio(portfolio *models.RoboPo
 
 	for _, category := range portfolio.Categories {
 		for _, asset := range category.Assets {
-			if err := tx.Delete(&asset).Error; err != nil {
+			if err := tx.Unscoped().Delete(&asset).Error; err != nil {
 				tx.Rollback()
 				return fmt.Errorf("failed to delete asset %s: %w", asset.Symbol, err)
 			}
@@ -133,13 +136,13 @@ func (r *postgresRoboPortfolioRepo) DeleteRoboPortfolio(portfolio *models.RoboPo
 	}
 
 	for _, category := range portfolio.Categories {
-		if err := tx.Delete(&category).Error; err != nil {
+		if err := tx.Unscoped().Delete(&category).Error; err != nil {
 			tx.Rollback()
 			return fmt.Errorf("failed to delete category %s: %w", category.Name, err)
 		}
 	}
 
-	if err := tx.Delete(&portfolio).Error; err != nil {
+	if err := tx.Unscoped().Delete(&portfolio).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete portfolio: %w", err)
 	}
@@ -150,4 +153,26 @@ func (r *postgresRoboPortfolioRepo) DeleteRoboPortfolio(portfolio *models.RoboPo
 	}
 
 	return nil
+}
+
+func (r *postgresRoboPortfolioRepo) CreateRoboPortfolioTransaction(transaction *models.RoboPortfolioTransaction) error {
+	if transaction == nil {
+		return commons.ErrNil
+	}
+
+	if err := r.db.Create(&transaction).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return gorm.ErrDuplicatedKey
+		}
+		return err
+	}
+	return nil
+}
+
+func (r *postgresRoboPortfolioRepo) GetRoboPortfolioTransactionDetails(userID uint) ([]*models.RoboPortfolioTransaction, error) {
+	var transactions []*models.RoboPortfolioTransaction
+	err := r.db.Joins("JOIN robo_portfolios ON robo_portfolio_transactions.robo_portfolio_id = robo_portfolios.id").
+		Where("robo_portfolios.user_id = ?", userID).
+		Find(&transactions).Error
+	return transactions, err
 }
