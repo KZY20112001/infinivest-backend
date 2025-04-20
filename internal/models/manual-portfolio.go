@@ -4,10 +4,11 @@ import "gorm.io/gorm"
 
 type ManualPortfolio struct {
 	gorm.Model
-	UserID    uint                    `gorm:"primaryKey"`
-	Name      string                  `gorm:"uniqueIndex" json:"name"`
-	Assets    []*ManualPortfolioAsset `json:"assets"`
-	TotalCash float64                 `json:"totalCash"`
+	UserID       uint                          `gorm:"not null;index:idx_user_name,unique"`
+	Name         string                        `gorm:"index:idx_user_name,unique" json:"name"`
+	Assets       []*ManualPortfolioAsset       `json:"assets"`
+	TotalCash    float64                       `json:"totalCash"`
+	Transactions []*ManualPortfolioTransaction `json:"manualPortfolioTransactions"`
 }
 
 type ManualPortfolioAsset struct {

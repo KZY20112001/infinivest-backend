@@ -109,7 +109,6 @@ func (h *RoboPortfolioHandler) AddMoneyToRoboPortfolio(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
 	userID := c.GetUint("id")
 	portfolio, err := h.service.AddMoneyToRoboPortfolio(c.Request.Context(), userID, req.Amount)
 	if err != nil {
