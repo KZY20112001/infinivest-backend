@@ -27,15 +27,17 @@ func (ps *profileServiceImpl) CreateProfile(userID uint, dto dto.ProfileRequest)
 		return err
 	}
 	profile := models.Profile{
-		UserID:     userID,
-		User:       *user,
-		FirstName:  dto.FirstName,
-		LastName:   dto.LastName,
-		Address:    dto.Address,
-		ProfileUrl: dto.ProfileUrl,
-		ProfileID:  dto.ProfileID,
-		// RoboAdvisorPortfolio: nil,
-		// ManualPortfolio:      []models.Portfolio{},
+		UserID:            userID,
+		User:              *user,
+		FirstName:         dto.FirstName,
+		LastName:          dto.LastName,
+		ProfileUrl:        dto.ProfileUrl,
+		ProfileID:         dto.ProfileID,
+		RiskTolerance:     dto.RiskTolerance,
+		InvestmentStyle:   dto.InvestmentStyle,
+		InvestmentHorizon: dto.InvestmentHorizon,
+		AnnualIncome:      dto.AnnualIncome,
+		ExperienceLevel:   dto.ExperienceLevel,
 	}
 	return ps.repo.CreateProfile(&profile)
 }
@@ -47,9 +49,13 @@ func (ps *profileServiceImpl) UpdateProfile(userID uint, dto dto.ProfileRequest)
 	}
 	profile.FirstName = dto.FirstName
 	profile.LastName = dto.LastName
-	profile.Address = dto.Address
 	profile.ProfileUrl = dto.ProfileUrl
 	profile.ProfileID = dto.ProfileID
+	profile.RiskTolerance = dto.RiskTolerance
+	profile.InvestmentStyle = dto.InvestmentStyle
+	profile.InvestmentHorizon = dto.InvestmentHorizon
+	profile.AnnualIncome = dto.AnnualIncome
+	profile.ExperienceLevel = dto.ExperienceLevel
 	return ps.repo.UpdateProfile(profile)
 }
 
