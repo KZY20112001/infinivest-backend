@@ -1,14 +1,15 @@
-package caches
+package redis
 
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
-type RoboPortfolioCache interface {
+type RoboPortfolioRedis interface {
 	AddPortfolioToRebalancingQueue(ctx context.Context, userID, portfolioID uint, nextRebalance time.Time) error
 	GetNextRebalanceTime(ctx context.Context, userID, portfolioID uint) (time.Time, error)
 	DeletePortfolioFromQueue(ctx context.Context, userID, portfolioID uint) error
@@ -17,13 +18,16 @@ type RoboPortfolioCache interface {
 
 	AcquireLock(ctx context.Context, userID, portfolioID uint, ttl time.Duration) (bool, error)
 	ReleaseLock(ctx context.Context, userID, portfolioID uint) error
+
+	SetLastSeen(ctx context.Context, userID, portfolioID uint) error
+	GetLastSeen(ctx context.Context, userID, portfolioID uint) (time.Time, error)
 }
 
 type roboPortfolioRedis struct {
 	client *redis.Client
 }
 
-func NewPortfolioRedis(client *redis.Client) *roboPortfolioRedis {
+func NewRoboPortfolioRedis(client *redis.Client) *roboPortfolioRedis {
 	return &roboPortfolioRedis{client: client}
 }
 
@@ -68,6 +72,7 @@ func (r *roboPortfolioRedis) DeletePortfolioFromQueue(ctx context.Context, userI
 }
 
 func (r *roboPortfolioRedis) GetDuePortfolios(ctx context.Context) ([]string, error) {
+
 	key := "rebalancing_queue"
 	now := float64(time.Now().Unix())
 
@@ -82,7 +87,7 @@ func (r *roboPortfolioRedis) GetDuePortfolios(ctx context.Context) ([]string, er
 	if len(results) == 0 {
 		return nil, fmt.Errorf("no portfolios due for rebalancing")
 	}
-
+	fmt.Println("Due portfolios:", results)
 	var portfolios []string
 	for _, result := range results {
 		member := result.Member.(string) // userID:portfolioID
@@ -100,6 +105,31 @@ func (r *roboPortfolioRedis) IsEmpty(ctx context.Context) (bool, error) {
 	}
 
 	return card == 0, nil
+}
+
+func (r *roboPortfolioRedis) SetLastSeen(ctx context.Context, userID, portfolioID uint) error {
+	key := fmt.Sprintf("rebalance_last_seen:%d:%d", userID, portfolioID)
+	_, err := r.client.Set(ctx, key, time.Now().Unix(), 0).Result()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *roboPortfolioRedis) GetLastSeen(ctx context.Context, userID, portfolioID uint) (time.Time, error) {
+	key := fmt.Sprintf("rebalance_last_seen:%d:%d", userID, portfolioID)
+	lastSeen, err := r.client.Get(ctx, key).Result()
+	if err != nil {
+		if err == redis.Nil { // zero time returned if key does not exist yet
+			return time.Time{}, nil
+		}
+		return time.Time{}, err
+	}
+	lastSeenUnix, err := strconv.ParseInt(lastSeen, 10, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(lastSeenUnix, 0), nil
 }
 
 func (r *roboPortfolioRedis) AcquireLock(ctx context.Context, userID, portfolioID uint, ttl time.Duration) (bool, error) {

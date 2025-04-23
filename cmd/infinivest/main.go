@@ -35,7 +35,7 @@ func init() {
 	if err != nil {
 		log.Fatalf("error in connecting to database: %v", err.Error())
 	}
-	postgresDB.AutoMigrate(&models.User{}, &models.Profile{}, &models.RoboPortfolio{}, &models.RoboPortfolioCategory{}, &models.RoboPortfolioAsset{}, &models.ManualPortfolio{}, &models.ManualPortfolioAsset{})
+	postgresDB.AutoMigrate(&models.User{}, &models.Profile{}, &models.RoboPortfolio{}, &models.RoboPortfolioCategory{}, &models.RoboPortfolioAsset{}, &models.RoboPortfolioTransaction{}, &models.ManualPortfolio{}, &models.ManualPortfolioAsset{}, &models.ManualPortfolioTransaction{})
 
 	redisClient, err = db.ConnectToRedis()
 	if err != nil {
@@ -61,30 +61,31 @@ func main() {
 		postgresDB, presignClient, appConf.FlaskMicroserviceURL,
 	)
 
-	// init caches
-	portfolioCache := setup.Caches(redisClient)
+	// init redis
+	roboPortfolioRedis, notificationRedis := setup.Redis(redisClient)
 
 	// init services
-	userService, profileService, roboPortfolioService, manualPortfolioService, s3Service, genAIService := setup.Services(
-		portfolioCache, userRepo, profileRepo, roboPortfolioRepo, manualPortfolioRepo, s3Repo, genAIRepo,
+	userService, profileService, roboPortfolioService, manualPortfolioService, notificationService, s3Service, genAIService := setup.Services(
+		roboPortfolioRedis, notificationRedis, userRepo, profileRepo, roboPortfolioRepo, manualPortfolioRepo, s3Repo, genAIRepo,
 	)
 
 	// init handlers
-	userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, s3Handler := setup.Handlers(
-		userService, profileService, roboPortfolioService, manualPortfolioService, s3Service, genAIService,
+	userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, noficationHandler, s3Handler := setup.Handlers(
+		userService, profileService, roboPortfolioService, manualPortfolioService, notificationService, s3Service, genAIService,
 	)
 
 	// init schedulers
 	portfolioScheduler := setup.PortfolioScheduler(
-		roboPortfolioService, roboPortfolioRepo, portfolioCache,
+		roboPortfolioService, roboPortfolioRepo, roboPortfolioRedis,
 	)
 
 	portfolioScheduler.Start(ctx)
-	r := routes.RegisterRoutes(userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, s3Handler)
+	r := routes.RegisterRoutes(userHandler, profileHandler, roboPortfolioHandler, manualPortfolioHandler, noficationHandler, s3Handler)
 	srv := &http.Server{
 		Addr:    ":8080",
 		Handler: r,
 	}
+
 	// Initializing the server in a goroutine so that
 	// it won't block the graceful shutdown handling below
 	go func() {

@@ -1,13 +1,14 @@
 package setup
 
 import (
-	"github.com/KZY20112001/infinivest-backend/internal/caches"
+	"github.com/KZY20112001/infinivest-backend/internal/redis"
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 	"github.com/KZY20112001/infinivest-backend/internal/services"
 )
 
 func Services(
-	portfolioCache caches.RoboPortfolioCache,
+	portfolioRedis redis.RoboPortfolioRedis,
+	notificationRedis redis.NotificationRedis,
 	userRepo repositories.UserRepo,
 	profileRepo repositories.ProfileRepo,
 	roboPortfolioRepo repositories.RoboPortfolioRepo,
@@ -19,6 +20,7 @@ func Services(
 	services.ProfileService,
 	services.RoboPortfolioService,
 	services.ManualPortfolioService,
+	services.NotificationService,
 	services.S3Service,
 	services.GenAIService,
 ) {
@@ -30,13 +32,14 @@ func Services(
 
 	genAIService := services.NewGenAIService(genAIRepo)
 
+	notificationService := services.NewNotificationService(notificationRedis)
 	roboPortfolioService := services.NewRoboPortfolioService(
-		roboPortfolioRepo, portfolioCache, genAIService,
+		roboPortfolioRepo, portfolioRedis, genAIService, notificationService,
 	)
 
 	manualPortfolioService := services.NewManualPortfolioService(
 		manualPortfolioRepo, genAIService,
 	)
 
-	return userService, profileService, roboPortfolioService, manualPortfolioService, s3Service, genAIService
+	return userService, profileService, roboPortfolioService, manualPortfolioService, notificationService, s3Service, genAIService
 }

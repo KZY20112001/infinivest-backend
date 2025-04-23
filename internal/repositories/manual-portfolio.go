@@ -16,6 +16,9 @@ type ManualPortfolioRepo interface {
 	UpdateManualPortfolioName(portfolio *models.ManualPortfolio, newName string) error
 	UpdateManualPortfolio(portfolio *models.ManualPortfolio) error
 	DeleteManualPortfolio(portfolio *models.ManualPortfolio) error
+
+	CreateManualPortfolioTransaction(transaction *models.ManualPortfolioTransaction) error
+	GetManualPortfolioTransactions(userID, portfolioID uint, limit int) ([]*models.ManualPortfolioTransaction, error)
 }
 
 type postgresManualPortfolioRepo struct {
@@ -117,13 +120,13 @@ func (r *postgresManualPortfolioRepo) DeleteManualPortfolio(portfolio *models.Ma
 	}()
 
 	for _, asset := range portfolio.Assets {
-		if err := tx.Delete(&asset).Error; err != nil {
+		if err := tx.Unscoped().Delete(&asset).Error; err != nil {
 			tx.Rollback()
 			return fmt.Errorf("failed to delete asset %s: %w", asset.Symbol, err)
 		}
 	}
 
-	if err := tx.Delete(&portfolio).Error; err != nil {
+	if err := tx.Unscoped().Delete(&portfolio).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete portfolio: %w", err)
 	}
@@ -134,4 +137,37 @@ func (r *postgresManualPortfolioRepo) DeleteManualPortfolio(portfolio *models.Ma
 	}
 
 	return nil
+}
+
+func (r *postgresManualPortfolioRepo) CreateManualPortfolioTransaction(transaction *models.ManualPortfolioTransaction) error {
+	if transaction == nil {
+		return commons.ErrNil
+	}
+
+	if err := r.db.Create(&transaction).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return gorm.ErrDuplicatedKey
+		}
+		return err
+	}
+	return nil
+}
+
+func (r *postgresManualPortfolioRepo) GetManualPortfolioTransactions(userID, portfolioID uint, limit int) ([]*models.ManualPortfolioTransaction, error) {
+	var transactions []*models.ManualPortfolioTransaction
+
+	query := r.db.Where("manual_portfolio_user_id = ? AND manual_portfolio_id = ?", userID, portfolioID)
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	if err := query.Find(&transactions).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, gorm.ErrRecordNotFound
+		}
+		return nil, err
+	}
+
+	return transactions, nil
 }

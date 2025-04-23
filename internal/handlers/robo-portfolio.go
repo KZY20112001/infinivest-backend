@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/KZY20112001/infinivest-backend/internal/commons"
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
@@ -109,7 +110,6 @@ func (h *RoboPortfolioHandler) AddMoneyToRoboPortfolio(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
 	userID := c.GetUint("id")
 	portfolio, err := h.service.AddMoneyToRoboPortfolio(c.Request.Context(), userID, req.Amount)
 	if err != nil {
@@ -161,4 +161,45 @@ func (h *RoboPortfolioHandler) DeleteRoboPortfolio(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully deleted the portfolio"})
+}
+
+func (h *RoboPortfolioHandler) GetRoboPortfolioTransactions(c *gin.Context) {
+	userID := c.GetUint("id")
+	limitStr := c.Query("limit")
+
+	limit := 0
+	if limitStr != "" {
+		parsedLimit, err := strconv.Atoi(limitStr)
+		if err != nil || parsedLimit <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit parameter"})
+			return
+		}
+		limit = parsedLimit
+	}
+	transactions, err := h.service.GetRoboPortfolioTransactions(userID, limit)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"transactions": transactions})
+}
+
+func (h *RoboPortfolioHandler) GetRebalanceEvents(c *gin.Context) {
+	userID := c.GetUint("id")
+	rebalanceDetails, err := h.service.GetRebalanceEvents(c.Request.Context(), userID)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"rebalance_details": rebalanceDetails})
+}
+
+func (h *RoboPortfolioHandler) UpdateLastSeenRebalanceEvent(c *gin.Context) {
+	userID := c.GetUint("id")
+	err := h.service.UpdateLastSeenRebalanceTime(c.Request.Context(), userID)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully updated the last seen rebalance event"})
 }
