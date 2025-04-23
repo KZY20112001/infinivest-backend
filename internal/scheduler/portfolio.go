@@ -96,7 +96,7 @@ func (s *portfolioSchedulerImpl) rebalancePortfolios(ctx context.Context) {
 				}
 			}()
 
-			portfolio, err := s.service.RebalancePortfolio(userID, portfolioID)
+			portfolio, err := s.service.RebalancePortfolio(ctx, userID, portfolioID)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to rebalance portfolio %d:%d: %w", userID, portfolioID, err)
 				return

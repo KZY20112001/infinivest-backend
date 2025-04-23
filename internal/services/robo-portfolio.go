@@ -21,7 +21,7 @@ type RoboPortfolioService interface {
 	AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.RoboPortfolio, error)
 	WithDrawMoneyFromRoboPortfolio(ctx context.Context, userID uint, amount float64) (float64, error)
 	UpdateRebalanceFreq(ctx context.Context, userID uint, freq string) error
-	RebalancePortfolio(userID, portfolioID uint) (*models.RoboPortfolio, error)
+	RebalancePortfolio(ctx context.Context, userID, portfolioID uint) (*models.RoboPortfolio, error)
 	DeleteRoboPortfolio(ctx context.Context, userID uint) error
 
 	GetRoboPortfolioTransactions(userID uint, limit int) ([]*models.RoboPortfolioTransaction, error)
@@ -31,13 +31,14 @@ type RoboPortfolioService interface {
 }
 
 type roboPortfolioServiceImpl struct {
-	repo         repositories.RoboPortfolioRepo
-	redis        redis.RoboPortfolioRedis
-	genAIService GenAIService
+	repo                repositories.RoboPortfolioRepo
+	redis               redis.RoboPortfolioRedis
+	genAIService        GenAIService
+	notificationService NotificationService
 }
 
-func NewRoboPortfolioService(pr repositories.RoboPortfolioRepo, pc redis.RoboPortfolioRedis, gs GenAIService) *roboPortfolioServiceImpl {
-	return &roboPortfolioServiceImpl{repo: pr, redis: pc, genAIService: gs}
+func NewRoboPortfolioService(pr repositories.RoboPortfolioRepo, pc redis.RoboPortfolioRedis, gs GenAIService, ns NotificationService) *roboPortfolioServiceImpl {
+	return &roboPortfolioServiceImpl{repo: pr, redis: pc, genAIService: gs, notificationService: ns}
 }
 
 func (s *roboPortfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error {
@@ -261,7 +262,7 @@ func (s *roboPortfolioServiceImpl) UpdateRebalanceFreq(ctx context.Context, user
 	if portfolio.RebalanceFreq != nil && *portfolio.RebalanceFreq == freq {
 		return nil
 	}
-	if _, err := s.RebalancePortfolio(userID, portfolio.ID); err != nil {
+	if _, err := s.RebalancePortfolio(ctx, userID, portfolio.ID); err != nil {
 		return err
 	}
 
@@ -299,7 +300,7 @@ func (s *roboPortfolioServiceImpl) DeleteRoboPortfolio(ctx context.Context, user
 	return s.repo.DeleteRoboPortfolio(portfolio)
 }
 
-func (s *roboPortfolioServiceImpl) RebalancePortfolio(userID, portfolioID uint) (*models.RoboPortfolio, error) {
+func (s *roboPortfolioServiceImpl) RebalancePortfolio(ctx context.Context, userID, portfolioID uint) (*models.RoboPortfolio, error) {
 	log.Println("Rebalancing portfolio", portfolioID, "for user", userID)
 	portfolio, err := s.repo.GetRoboPortfolioDetails(userID)
 	if err != nil {
@@ -363,7 +364,10 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(userID, portfolioID uint) 
 
 	if *totalCash < targetCash {
 		// not enough cash, send a notification to the user
-		failReason = "cash is under-allocated"
+		failReason = "Cash is under-allocated. Expected: " + fmt.Sprintf("%.2f", targetCash) + ", Available: " + fmt.Sprintf("%.2f", *totalCash)
+		if err := s.notificationService.AddNotification(ctx, userID, "alert", failReason); err != nil {
+			log.Println("Failed to add notification:", err)
+		}
 		log.Printf("Warning: Cash is under-allocated. Expected: %.2f, Available: %.2f\n", targetCash, *totalCash)
 		// TODO: email notification service
 
@@ -403,6 +407,20 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(userID, portfolioID uint) 
 	log.Println("Rebalanced portfolio:", portfolioID, "for user", userID)
 	if err := s.repo.UnlockRoboPortfolio(portfolio); err != nil {
 		return nil, err
+	}
+
+	// add to notification queue
+	var message string = "Portfolio rebalanced successfully!"
+	if failReason != "" {
+		message = "Portfolio rebalanced with issues!"
+		if err := s.notificationService.AddNotification(ctx, userID, "alert", failReason); err != nil {
+			log.Println("Failed to add notification:", err)
+		}
+	}
+
+	if err := s.notificationService.AddNotification(ctx, userID, "rebalance", message); err != nil {
+		log.Println("Failed to add notification:", err)
+
 	}
 	return portfolio, nil
 }
@@ -598,7 +616,8 @@ func (s *roboPortfolioServiceImpl) buyUnderPerformingAssets(portfolioCategories 
 			mu.Lock()
 			if amountToBuy > *totalCash {
 				once.Do(func() {
-					*failReason = "insufficient funds when rebalancing assets"
+					*failReason = "There is not enough funds when rebalancing assets"
+
 				})
 				amountToBuy = *totalCash
 			}

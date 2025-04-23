@@ -32,14 +32,14 @@ func Services(
 
 	genAIService := services.NewGenAIService(genAIRepo)
 
+	notificationService := services.NewNotificationService(notificationRedis)
 	roboPortfolioService := services.NewRoboPortfolioService(
-		roboPortfolioRepo, portfolioRedis, genAIService,
+		roboPortfolioRepo, portfolioRedis, genAIService, notificationService,
 	)
 
 	manualPortfolioService := services.NewManualPortfolioService(
 		manualPortfolioRepo, genAIService,
 	)
 
-	notificationService := services.NewNotificationService(notificationRedis)
 	return userService, profileService, roboPortfolioService, manualPortfolioService, notificationService, s3Service, genAIService
 }
