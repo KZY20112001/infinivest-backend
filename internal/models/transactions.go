@@ -4,8 +4,8 @@ import "gorm.io/gorm"
 
 type RoboPortfolioTransaction struct {
 	gorm.Model
-	RoboPortfolioID      uint
-	AutoRebalanceEventID *uint
+	RoboPortfolioID  uint
+	RebalanceEventID *uint
 
 	TransactionType string  `json:"transactionType"` // "buy" or "sell" or "dividend" or "deposit" or "withdrawal"
 	TotalAmount     float64 `json:"totalAmount"`

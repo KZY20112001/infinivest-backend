@@ -10,6 +10,7 @@ func Handlers(
 	profileService services.ProfileService,
 	roboPortfolioService services.RoboPortfolioService,
 	manualPortfolioService services.ManualPortfolioService,
+	notificationService services.NotificationService,
 	s3Service services.S3Service,
 	genAIService services.GenAIService,
 ) (
@@ -17,11 +18,13 @@ func Handlers(
 	*handlers.ProfileHandler,
 	*handlers.RoboPortfolioHandler,
 	*handlers.ManualPortfolioHandler,
+	*handlers.NotificationHandler,
 	*handlers.S3Handler,
 ) {
 	return handlers.NewUserHandler(userService),
 		handlers.NewProfileHandler(profileService),
 		handlers.NewRoboPortfolioHandler(roboPortfolioService, genAIService),
 		handlers.NewManualPortfolioHandler(manualPortfolioService),
+		handlers.NewNotificationHandler(notificationService),
 		handlers.NewS3Handler(s3Service)
 }

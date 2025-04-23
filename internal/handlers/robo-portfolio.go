@@ -183,3 +183,23 @@ func (h *RoboPortfolioHandler) GetRoboPortfolioTransactions(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"transactions": transactions})
 }
+
+func (h *RoboPortfolioHandler) GetRebalanceEvents(c *gin.Context) {
+	userID := c.GetUint("id")
+	rebalanceDetails, err := h.service.GetRebalanceEvents(c.Request.Context(), userID)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"rebalance_details": rebalanceDetails})
+}
+
+func (h *RoboPortfolioHandler) UpdateLastSeenRebalanceEvent(c *gin.Context) {
+	userID := c.GetUint("id")
+	err := h.service.UpdateLastSeenRebalanceTime(c.Request.Context(), userID)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully updated the last seen rebalance event"})
+}

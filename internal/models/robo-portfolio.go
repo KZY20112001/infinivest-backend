@@ -7,8 +7,9 @@ type RoboPortfolio struct {
 	UserID          uint                        `gorm:"uniqueIndex;not null"`
 	Categories      []*RoboPortfolioCategory    `json:"categories"`
 	RebalanceFreq   *string                     `json:"rebalanceFreq"`
-	RebalanceEvents []*AutoRebalanceEvent       `json:"rebalanceEvents"`
+	RebalanceEvents []*RebalanceEvent           `json:"rebalanceEvents"`
 	Transactions    []*RoboPortfolioTransaction `json:"roboPortfolioTransactions"`
+	IsRebalancing   bool                        `json:"isRebalancing"`
 }
 
 type RoboPortfolioCategory struct {
@@ -33,7 +34,7 @@ type RoboPortfolioAsset struct {
 	AvgBuyPrice   float64 `json:"avgBuyPrice"`
 }
 
-type AutoRebalanceEvent struct {
+type RebalanceEvent struct {
 	gorm.Model
 	RoboPortfolioID uint `gorm:"not null"`
 

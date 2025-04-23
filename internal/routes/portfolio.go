@@ -6,16 +6,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, mh *handlers.ManualPortfolioHandler) {
+func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, mh *handlers.ManualPortfolioHandler, nh *handlers.NotificationHandler) {
 	portfolioGroup := r.Group("/portfolio")
 	portfolioGroup.Use(middlewares.AuthMiddleware())
-
+	notificationGroup := portfolioGroup.Group("/notifications")
+	{
+		notificationGroup.GET("/", nh.GetNotifications)
+	}
 	roboAdvisorGroup := portfolioGroup.Group("/robo-portfolio")
 	{
 		roboAdvisorGroup.GET("/details", rh.GetRoboPortfolioDetails)
 		roboAdvisorGroup.GET("/summary", rh.GetRoboPortfolioSummary)
-
-		roboAdvisorGroup.GET("/transactions", rh.GetRoboPortfolioTransactions)
 
 		roboAdvisorGroup.POST("/generate/categories", rh.GenerateRoboAdvisorPortfolio)
 		roboAdvisorGroup.POST("/generate/assets", rh.GenerateAssetAllocation)
@@ -28,6 +29,11 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 		roboAdvisorGroup.PUT("/update")
 
 		roboAdvisorGroup.DELETE("/", rh.DeleteRoboPortfolio)
+
+		roboAdvisorGroup.GET("/transactions", rh.GetRoboPortfolioTransactions)
+		roboAdvisorGroup.GET("/rebalance/details", rh.GetRebalanceEvents)
+		roboAdvisorGroup.PATCH("/rebalance/seen", rh.UpdateLastSeenRebalanceEvent)
+
 	}
 
 	manualGroup := portfolioGroup.Group("/manual-portfolio")

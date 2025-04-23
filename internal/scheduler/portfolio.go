@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/KZY20112001/infinivest-backend/internal/caches"
 	"github.com/KZY20112001/infinivest-backend/internal/commons"
+	"github.com/KZY20112001/infinivest-backend/internal/redis"
 	"github.com/KZY20112001/infinivest-backend/internal/repositories"
 	"github.com/KZY20112001/infinivest-backend/internal/services"
 )
@@ -21,15 +21,15 @@ type portfolioSchedulerImpl struct {
 	ticker  *time.Ticker
 	service services.RoboPortfolioService
 	repo    repositories.RoboPortfolioRepo
-	cache   caches.RoboPortfolioCache
+	redis   redis.RoboPortfolioRedis
 }
 
-func NewPortfolioSchedulerImpl(s services.RoboPortfolioService, r repositories.RoboPortfolioRepo, c caches.RoboPortfolioCache) *portfolioSchedulerImpl {
+func NewPortfolioSchedulerImpl(s services.RoboPortfolioService, r repositories.RoboPortfolioRepo, c redis.RoboPortfolioRedis) *portfolioSchedulerImpl {
 	return &portfolioSchedulerImpl{
 		ticker:  time.NewTicker(12 * time.Hour),
 		service: s,
 		repo:    r,
-		cache:   c,
+		redis:   c,
 	}
 }
 
@@ -51,7 +51,7 @@ func (s *portfolioSchedulerImpl) Start(ctx context.Context) {
 }
 
 func (s *portfolioSchedulerImpl) rebalancePortfolios(ctx context.Context) {
-	isEmpty, err := s.cache.IsEmpty(ctx)
+	isEmpty, err := s.redis.IsEmpty(ctx)
 	if err != nil {
 		log.Println("Failed to check if rebalancing queue is empty:", err)
 		return
@@ -60,7 +60,7 @@ func (s *portfolioSchedulerImpl) rebalancePortfolios(ctx context.Context) {
 		log.Println("No portfolios to rebalance")
 		return
 	}
-	portfolioIDs, err := s.cache.GetDuePortfolios(ctx)
+	portfolioIDs, err := s.redis.GetDuePortfolios(ctx)
 
 	if err != nil {
 		log.Println("Failed to get due portfolios for rebalancing:", err)
@@ -79,7 +79,7 @@ func (s *portfolioSchedulerImpl) rebalancePortfolios(ctx context.Context) {
 			log.Printf("Failed to parse portfolio %s: %v", portfolio, err)
 			continue
 		}
-		success, err := s.cache.AcquireLock(ctx, userID, portfolioID, 2*time.Minute)
+		success, err := s.redis.AcquireLock(ctx, userID, portfolioID, 2*time.Minute)
 		if !success || err != nil {
 			log.Printf("Portfolio %d:%d is already locked, skipping\n", userID, portfolioID)
 			continue
@@ -91,7 +91,7 @@ func (s *portfolioSchedulerImpl) rebalancePortfolios(ctx context.Context) {
 			defer func() {
 				wg.Done()
 				<-workerPool
-				if err := s.cache.ReleaseLock(ctx, userID, portfolioID); err != nil {
+				if err := s.redis.ReleaseLock(ctx, userID, portfolioID); err != nil {
 					log.Printf("Failed to release lock for portfolio %d:%d: %v", userID, portfolioID, err)
 				}
 			}()
@@ -103,7 +103,7 @@ func (s *portfolioSchedulerImpl) rebalancePortfolios(ctx context.Context) {
 			}
 
 			// delete current portfolio from queue and queue for the next rebalance time
-			if err := s.cache.DeletePortfolioFromQueue(ctx, userID, portfolioID); err != nil {
+			if err := s.redis.DeletePortfolioFromQueue(ctx, userID, portfolioID); err != nil {
 				errChan <- fmt.Errorf("failed to remove portfolio %d:%d from rebalancing queue: %w", userID, portfolioID, err)
 				return
 			}
@@ -114,7 +114,7 @@ func (s *portfolioSchedulerImpl) rebalancePortfolios(ctx context.Context) {
 				return
 			}
 
-			if err = s.cache.AddPortfolioToRebalancingQueue(ctx, userID, portfolio.ID, nextRebalanceTime); err != nil {
+			if err = s.redis.AddPortfolioToRebalancingQueue(ctx, userID, portfolio.ID, nextRebalanceTime); err != nil {
 				errChan <- fmt.Errorf("failed to add portfolio %d:%d to rebalancing queue: %w", userID, portfolioID, err)
 				return
 			}
