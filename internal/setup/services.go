@@ -34,7 +34,7 @@ func Services(
 
 	notificationService := services.NewNotificationService(notificationRedis)
 	roboPortfolioService := services.NewRoboPortfolioService(
-		roboPortfolioRepo, portfolioRedis, genAIService, notificationService,
+		roboPortfolioRepo, portfolioRedis, genAIService, notificationService, userService,
 	)
 
 	manualPortfolioService := services.NewManualPortfolioService(
