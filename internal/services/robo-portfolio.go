@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/KZY20112001/infinivest-backend/internal/commons"
+	"github.com/KZY20112001/infinivest-backend/internal/commons/email"
 	"github.com/KZY20112001/infinivest-backend/internal/dto"
 	"github.com/KZY20112001/infinivest-backend/internal/models"
 	"github.com/KZY20112001/infinivest-backend/internal/redis"
@@ -35,10 +36,11 @@ type roboPortfolioServiceImpl struct {
 	redis               redis.RoboPortfolioRedis
 	genAIService        GenAIService
 	notificationService NotificationService
+	userService         UserService
 }
 
-func NewRoboPortfolioService(pr repositories.RoboPortfolioRepo, pc redis.RoboPortfolioRedis, gs GenAIService, ns NotificationService) *roboPortfolioServiceImpl {
-	return &roboPortfolioServiceImpl{repo: pr, redis: pc, genAIService: gs, notificationService: ns}
+func NewRoboPortfolioService(pr repositories.RoboPortfolioRepo, pc redis.RoboPortfolioRedis, gs GenAIService, ns NotificationService, us UserService) *roboPortfolioServiceImpl {
+	return &roboPortfolioServiceImpl{repo: pr, redis: pc, genAIService: gs, notificationService: ns, userService: us}
 }
 
 func (s *roboPortfolioServiceImpl) ConfirmGeneratedRoboPortfolio(req dto.ConfirmPortfolioRequest, userID uint) error {
@@ -113,12 +115,26 @@ func (s *roboPortfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
+
 	// lock the portfolio to prevent concurrent updates
 	if err := s.repo.LockRoboPortfolio(portfolio); err != nil {
 		return nil, err
 	}
 
 	if err := s.addMoneyToPortfolio(portfolio, amount); err != nil {
+		return nil, err
+	}
+
+	err = s.repo.CreateRoboPortfolioTransaction(&models.RoboPortfolioTransaction{
+		RoboPortfolioID: portfolio.ID,
+		TransactionType: "deposit",
+		TotalAmount:     amount,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.UnlockRoboPortfolio(portfolio); err != nil {
 		return nil, err
 	}
 
@@ -137,20 +153,6 @@ func (s *roboPortfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, 
 		return nil, err
 	}
 
-	// unlock the portfolio after adding to queue
-	if err := s.repo.UnlockRoboPortfolio(portfolio); err != nil {
-		return nil, err
-	}
-
-	err = s.repo.CreateRoboPortfolioTransaction(&models.RoboPortfolioTransaction{
-		RoboPortfolioID: portfolio.ID,
-		TransactionType: "deposit",
-		TotalAmount:     amount,
-	})
-
-	if err != nil {
-		return nil, err
-	}
 	return portfolio, nil
 }
 
@@ -180,8 +182,11 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 		}
 		return amount, nil
 	}
+
 	// sell assets to cover the remaining amount
-	originalAmount := amount
+	leftToWithdraw := amount
+	withdrawn := 0.0
+	withdrawn += cashCategory.TotalAmount
 	amount -= cashCategory.TotalAmount
 	cashCategory.TotalAmount = 0
 	var wg sync.WaitGroup
@@ -201,7 +206,7 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 					errChan <- fmt.Errorf("failed to get latest price for asset %s: %w", asset.Symbol, err)
 					return
 				}
-				amountToSell := originalAmount * asset.Percentage / 100
+				amountToSell := amount * asset.Percentage / 100
 				numOfShares := amountToSell / latestPrice
 				if numOfShares > asset.SharesOwned {
 					numOfShares = asset.SharesOwned
@@ -212,7 +217,8 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 				if category.TotalAmount < 0 {
 					category.TotalAmount = 0
 				}
-				amount -= curAmount
+				leftToWithdraw -= curAmount
+				withdrawn += curAmount
 				mu.Unlock()
 				asset.SharesOwned -= numOfShares
 				asset.TotalInvested -= curAmount
@@ -243,14 +249,14 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 	err = s.repo.CreateRoboPortfolioTransaction(&models.RoboPortfolioTransaction{
 		RoboPortfolioID: portfolio.ID,
 		TransactionType: "withdrawal",
-		TotalAmount:     originalAmount - amount,
+		TotalAmount:     withdrawn,
 	})
 
 	if err != nil {
 		return 0, err
 	}
 
-	return originalAmount - amount, nil
+	return withdrawn, nil
 }
 
 func (s *roboPortfolioServiceImpl) UpdateRebalanceFreq(ctx context.Context, userID uint, freq string) error {
@@ -363,15 +369,33 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(ctx context.Context, userI
 	targetCash := totalValue * cashCategory.TotalPercentage / 100
 
 	if *totalCash < targetCash {
+		cashCategory.TotalAmount = *totalCash
+
 		// not enough cash, send a notification to the user
 		failReason = "Cash is under-allocated. Expected: " + fmt.Sprintf("%.2f", targetCash) + ", Available: " + fmt.Sprintf("%.2f", *totalCash)
 		if err := s.notificationService.AddNotification(ctx, userID, "alert", failReason); err != nil {
 			log.Println("Failed to add notification:", err)
 		}
 		log.Printf("Warning: Cash is under-allocated. Expected: %.2f, Available: %.2f\n", targetCash, *totalCash)
-		// TODO: email notification service
-
-		cashCategory.TotalAmount = *totalCash
+		user, err := s.userService.GetUser(userID)
+		if err != nil {
+			log.Printf("Failed to get profile for user %d: %v\n", userID, err)
+		} else {
+			subject := "Alert from InfiniVest"
+			body := fmt.Sprintf(`
+			<p>Dear User,</p>
+			<p>We encountered an issue during the rebalancing process of your robo-portfolio due to insufficient available cash.</p>
+			<p><strong>Expected Cash:</strong> $%.2f<br>
+			<strong>Available Cash:</strong> $%.2f</p>
+			<p>Please top up your robo-portfolio to ensure optimal performance.</p>
+			<p>If you have any questions, feel free to reach out to our support team.</p>
+			<p>Best regards,<br>
+			The InfiniVest Team</p>
+		`, targetCash, *totalCash)
+			if err := email.SendEmail(user.Email, subject, body); err != nil {
+				log.Println("Failed to send email:", err)
+			}
+		}
 	} else if *totalCash > targetCash {
 		// too much cash: add the extra back into the portfolio
 		excessCash := *totalCash - targetCash
