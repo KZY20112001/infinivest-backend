@@ -203,3 +203,20 @@ func (h *RoboPortfolioHandler) UpdateLastSeenRebalanceEvent(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully updated the last seen rebalance event"})
 }
+
+func (h *RoboPortfolioHandler) RebalanceRoboPortfolio(c *gin.Context) {
+	userID := c.GetUint("id")
+	portfolio, err := h.service.GetRoboPortfolioDetails(userID)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	portfolio, err = h.service.RebalancePortfolio(c.Request.Context(), userID, portfolio.ID)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": portfolio})
+
+}

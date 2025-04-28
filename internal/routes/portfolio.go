@@ -34,6 +34,8 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 		roboAdvisorGroup.GET("/rebalance/details", rh.GetRebalanceEvents)
 		roboAdvisorGroup.PATCH("/rebalance/seen", rh.UpdateLastSeenRebalanceEvent)
 
+		// testing only
+		roboAdvisorGroup.GET("/rebalance", rh.RebalanceRoboPortfolio)
 	}
 
 	manualGroup := portfolioGroup.Group("/manual-portfolio")
