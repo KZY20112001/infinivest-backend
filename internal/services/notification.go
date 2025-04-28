@@ -26,6 +26,6 @@ func (ns *notificationServiceImpl) GetNotifications(ctx context.Context, userID,
 
 func (ns *notificationServiceImpl) AddNotification(ctx context.Context, userID uint, notiType, message string) error {
 	time := time.Now().Format("2006-01-02 15:04:05")
-	notification := time + ": " + notiType + ": " + message
+	notification := time + "; " + notiType + "; " + message
 	return ns.redis.AddNotification(ctx, userID, notification)
 }
