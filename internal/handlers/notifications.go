@@ -36,3 +36,13 @@ func (h *NotificationHandler) GetNotifications(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"notifications": notifications})
 }
+
+func (h *NotificationHandler) ClearNotifications(c *gin.Context) {
+	userID := c.GetUint("id")
+	err := h.service.ClearNotifications(c.Request.Context(), userID)
+	if err != nil {
+		commons.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Notifications cleared successfully"})
+}

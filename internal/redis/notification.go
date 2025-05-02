@@ -10,6 +10,7 @@ import (
 type NotificationRedis interface {
 	AddNotification(ctx context.Context, userID uint, notification string) error
 	GetNotifications(ctx context.Context, userID, limit uint) ([]string, error)
+	ClearNotifications(ctx context.Context, userID uint) error
 }
 
 type notificationRedis struct {
@@ -27,11 +28,14 @@ func (r *notificationRedis) AddNotification(ctx context.Context, userID uint, no
 
 func (r *notificationRedis) GetNotifications(ctx context.Context, userID, limit uint) ([]string, error) {
 	key := fmt.Sprintf("notification_queue:%d", userID)
-
-	var end int64 = 0
+	var end int64 = -1
 	if limit > 0 {
 		end = int64(limit) - 1
 	}
-
 	return r.client.LRange(ctx, key, 0, end).Result()
+}
+
+func (r *notificationRedis) ClearNotifications(ctx context.Context, userID uint) error {
+	key := fmt.Sprintf("notification_queue:%d", userID)
+	return r.client.Del(ctx, key).Err()
 }

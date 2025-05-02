@@ -373,7 +373,7 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(ctx context.Context, userI
 
 		// not enough cash, send a notification to the user
 		failReason = "Cash is under-allocated. Expected: " + fmt.Sprintf("%.2f", targetCash) + ", Available: " + fmt.Sprintf("%.2f", *totalCash)
-		if err := s.notificationService.AddNotification(ctx, userID, "alert", failReason); err != nil {
+		if err := s.notificationService.AddNotification(ctx, userID, "rebalance", failReason); err != nil {
 			log.Println("Failed to add notification:", err)
 		}
 		log.Printf("Warning: Cash is under-allocated. Expected: %.2f, Available: %.2f\n", targetCash, *totalCash)
@@ -437,7 +437,7 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(ctx context.Context, userI
 	var message string = "Portfolio rebalanced successfully!"
 	if failReason != "" {
 		message = "Portfolio rebalanced with issues!"
-		if err := s.notificationService.AddNotification(ctx, userID, "alert", failReason); err != nil {
+		if err := s.notificationService.AddNotification(ctx, userID, "rebalance", failReason); err != nil {
 			log.Println("Failed to add notification:", err)
 		}
 	}
