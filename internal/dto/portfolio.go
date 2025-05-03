@@ -18,6 +18,7 @@ type RoboAdvisorRecommendationResponse struct {
 type RoboPortfolioSummaryResponse struct {
 	RebalanceFreq string  `json:"rebalanceFreq"`
 	TotalValue    float64 `json:"totalValue"`
+	TotalInvested float64 `json:"totalInvested"`
 }
 
 type AssetAllocationRequest struct {

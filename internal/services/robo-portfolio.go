@@ -101,13 +101,14 @@ func (s *roboPortfolioServiceImpl) GetRoboPortfolioSummary(userID uint) (dto.Rob
 	if err != nil {
 		return dto.RoboPortfolioSummaryResponse{}, err
 	}
-	totalValue, err := s.getPortfolioValue(portfolio, make(map[string]float64))
+	totalValue, totalInvested, err := s.getPortfolioValue(portfolio, make(map[string]float64))
 	if err != nil {
 		return dto.RoboPortfolioSummaryResponse{}, err
 	}
 	return dto.RoboPortfolioSummaryResponse{
 		RebalanceFreq: *portfolio.RebalanceFreq,
-		TotalValue:    totalValue}, nil
+		TotalValue:    totalValue,
+		TotalInvested: totalInvested}, nil
 }
 
 func (s *roboPortfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.RoboPortfolio, error) {
@@ -293,7 +294,7 @@ func (s *roboPortfolioServiceImpl) DeleteRoboPortfolio(ctx context.Context, user
 		return err
 	}
 
-	totalValue, err := s.getPortfolioValue(portfolio, make(map[string]float64))
+	totalValue, _, err := s.getPortfolioValue(portfolio, make(map[string]float64))
 	if err != nil {
 		return err
 	}
@@ -323,7 +324,7 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(ctx context.Context, userI
 
 	//get total portfolio value
 	latestAssetPrices := make(map[string]float64)
-	totalValue, err := s.getPortfolioValue(portfolio, latestAssetPrices)
+	totalValue, _, err := s.getPortfolioValue(portfolio, latestAssetPrices)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get portfolio value: %w", err)
 	}
@@ -514,16 +515,19 @@ func (s *roboPortfolioServiceImpl) addMoneyToPortfolio(portfolio *models.RoboPor
 	return nil
 }
 
-func (s *roboPortfolioServiceImpl) getPortfolioValue(portfolio *models.RoboPortfolio, latestAssetPrices map[string]float64) (float64, error) {
+func (s *roboPortfolioServiceImpl) getPortfolioValue(portfolio *models.RoboPortfolio, latestAssetPrices map[string]float64) (float64, float64, error) {
 	var mu sync.Mutex
 
 	totalValue := 0.0
+	totalInvested := 0.0
 	for _, category := range portfolio.Categories {
 		if category.Name == "cash" {
 			totalValue += category.TotalAmount
+			totalInvested += category.TotalAmount
 			continue
 		}
 		categoryValue := 0.0
+		categoryInvested := 0.0
 		var wg sync.WaitGroup
 		errCh := make(chan error, len(category.Assets))
 		for _, asset := range category.Assets {
@@ -541,6 +545,7 @@ func (s *roboPortfolioServiceImpl) getPortfolioValue(portfolio *models.RoboPortf
 				mu.Lock()
 				latestAssetPrices[asset.Symbol] = latestPrice
 				categoryValue += assetValue
+				categoryInvested += asset.TotalInvested
 				mu.Unlock()
 			}(asset)
 		}
@@ -548,13 +553,14 @@ func (s *roboPortfolioServiceImpl) getPortfolioValue(portfolio *models.RoboPortf
 		wg.Wait()
 		close(errCh)
 		for err := range errCh {
-			return 0, err
+			return 0, 0, err
 		}
 		category.TotalAmount = categoryValue
 		totalValue += categoryValue
+		totalInvested += categoryInvested
 	}
 
-	return totalValue, nil
+	return totalValue, totalInvested, nil
 }
 
 func (s *roboPortfolioServiceImpl) sellOverPerformingAssets(portfolioCategories []*models.RoboPortfolioAsset, latestAssetPricess map[string]float64, totalValue float64, totalCash *float64) (float64, error) {
