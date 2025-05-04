@@ -14,6 +14,7 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 		notificationGroup.GET("/", nh.GetNotifications)
 		notificationGroup.DELETE("/", nh.ClearNotifications)
 	}
+
 	roboAdvisorGroup := portfolioGroup.Group("/robo-portfolio")
 	{
 		roboAdvisorGroup.GET("/details", rh.GetRoboPortfolioDetails)

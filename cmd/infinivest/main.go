@@ -35,7 +35,7 @@ func init() {
 	if err != nil {
 		log.Fatalf("error in connecting to database: %v", err.Error())
 	}
-	postgresDB.AutoMigrate(&models.User{}, &models.Profile{}, &models.RoboPortfolio{}, &models.RoboPortfolioCategory{}, &models.RoboPortfolioAsset{}, &models.RoboPortfolioTransaction{}, &models.ManualPortfolio{}, &models.ManualPortfolioAsset{}, &models.ManualPortfolioTransaction{})
+	postgresDB.AutoMigrate(&models.User{}, &models.Profile{}, &models.RoboPortfolio{}, &models.RoboPortfolioCategory{}, &models.RoboPortfolioAsset{}, &models.RoboPortfolioTransaction{}, &models.ManualPortfolio{}, &models.ManualPortfolioAsset{}, &models.ManualPortfolioTransaction{}, &models.RebalanceEvent{})
 
 	redisClient, err = db.ConnectToRedis()
 	if err != nil {

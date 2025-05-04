@@ -14,7 +14,7 @@ type ManualPortfolioService interface {
 	GetManualPortfoliosSummaries(userID uint) ([]dto.ManualPortfolioSummaryResponse, error)
 
 	GetManualPortfolio(userID uint, portfolioName string) (*models.ManualPortfolio, error)
-	GetPorfolioValue(userID uint, portfolioName string) (float64, error)
+	GetPorfolioValue(userID uint, portfolioName string) (float64, float64, error)
 
 	CreateManualPortfolio(userID uint, portfolioName string) error
 	UpdatePortfolioName(userID uint, portfolioName, newName string) error
@@ -57,13 +57,14 @@ func (s *manualPortfolioServiceImpl) GetManualPortfoliosSummaries(userID uint) (
 		wg.Add(1)
 		go func(portfolio *models.ManualPortfolio) {
 			defer wg.Done()
-			totalValue, err := s.GetPorfolioValue(portfolio.UserID, portfolio.Name)
+			totalValue, totalInvested, err := s.GetPorfolioValue(portfolio.UserID, portfolio.Name)
 			if err != nil {
 				return
 			}
 			summaries <- dto.ManualPortfolioSummaryResponse{
-				Name:       portfolio.Name,
-				TotalValue: totalValue,
+				Name:          portfolio.Name,
+				TotalValue:    totalValue,
+				TotalInvested: totalInvested,
 			}
 		}(portfolio)
 	}
@@ -87,13 +88,15 @@ func (s *manualPortfolioServiceImpl) CreateManualPortfolio(userID uint, portfoli
 	return s.repo.CreateManualPortfolio(portfolio)
 }
 
-func (s *manualPortfolioServiceImpl) GetPorfolioValue(userID uint, portfolioName string) (float64, error) {
+func (s *manualPortfolioServiceImpl) GetPorfolioValue(userID uint, portfolioName string) (float64, float64, error) {
 	portfolio, err := s.repo.GetManualPortfolio(userID, portfolioName)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
 	totalValue := portfolio.TotalCash
+	totalInvested := portfolio.TotalCash
+
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	for _, asset := range portfolio.Assets {
@@ -106,12 +109,13 @@ func (s *manualPortfolioServiceImpl) GetPorfolioValue(userID uint, portfolioName
 			}
 			mu.Lock()
 			totalValue += asset.SharesOwned * latestValue
+			totalInvested += asset.TotalInvested
 			mu.Unlock()
 		}(asset)
 
 	}
 	wg.Wait()
-	return totalValue, nil
+	return totalValue, totalInvested, nil
 }
 
 func (s *manualPortfolioServiceImpl) UpdatePortfolioName(userID uint, portfolioName, newName string) error {
@@ -300,7 +304,7 @@ func (s *manualPortfolioServiceImpl) DeleteManualPortfolio(userID uint, portfoli
 	if err != nil {
 		return err
 	}
-	totalValue, err := s.GetPorfolioValue(userID, portfolioName)
+	totalValue, _, err := s.GetPorfolioValue(userID, portfolioName)
 	if err != nil {
 		return err
 	}

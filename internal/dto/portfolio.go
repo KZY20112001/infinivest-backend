@@ -73,6 +73,7 @@ type ManualPortfolioSellAssetRequest struct {
 }
 
 type ManualPortfolioSummaryResponse struct {
-	TotalValue float64 `json:"totalValue"`
-	Name       string  `json:"name"`
+	TotalValue    float64 `json:"totalValue"`
+	TotalInvested float64 `json:"totalInvested"`
+	Name          string  `json:"name"`
 }
