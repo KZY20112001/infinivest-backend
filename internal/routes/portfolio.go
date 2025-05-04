@@ -58,6 +58,5 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 		manualGroup.PUT("/:name/sell", mh.SellAssetForManualPortfolio)
 
 		manualGroup.GET("/:name/transactions", mh.GetManualPortfolioTransactions)
-
 	}
 }

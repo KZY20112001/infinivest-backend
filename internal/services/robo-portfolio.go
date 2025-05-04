@@ -181,6 +181,21 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 		if err := s.repo.UpdateRoboPortfolio(portfolio); err != nil {
 			return 0, err
 		}
+
+		// unlock the portfolio after adding to queue
+		if err := s.repo.UnlockRoboPortfolio(portfolio); err != nil {
+			return 0, err
+		}
+
+		err = s.repo.CreateRoboPortfolioTransaction(&models.RoboPortfolioTransaction{
+			RoboPortfolioID: portfolio.ID,
+			TransactionType: "withdrawal",
+			TotalAmount:     amount,
+		})
+
+		if err != nil {
+			return 0, err
+		}
 		return amount, nil
 	}
 
@@ -294,13 +309,13 @@ func (s *roboPortfolioServiceImpl) DeleteRoboPortfolio(ctx context.Context, user
 		return err
 	}
 
-	totalValue, _, err := s.getPortfolioValue(portfolio, make(map[string]float64))
-	if err != nil {
-		return err
-	}
-	if totalValue > 0 {
-		return fmt.Errorf("portfolio %d for user %d has a total value of %.2f. Please withdraw all funds before deleting", portfolio.ID, userID, totalValue)
-	}
+	// totalValue, _, err := s.getPortfolioValue(portfolio, make(map[string]float64))
+	// if err != nil {
+	// 	return err
+	// }
+	// if totalValue > 0 {
+	// 	return fmt.Errorf("portfolio %d for user %d has a total value of %.2f. Please withdraw all funds before deleting", portfolio.ID, userID, totalValue)
+	// }
 	if err := s.redis.DeletePortfolioFromQueue(ctx, userID, portfolio.ID); err != nil {
 		return err
 	}
@@ -494,13 +509,28 @@ func (s *roboPortfolioServiceImpl) addMoneyToPortfolio(portfolio *models.RoboPor
 					return
 				}
 
-				asset.SharesOwned += assetAmount / latestPrice
+				sharesToBuy := assetAmount / latestPrice
+				asset.SharesOwned += sharesToBuy
 				asset.TotalInvested += assetAmount
 				if asset.SharesOwned > 0 {
 					asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
 				}
+
+				transaction := &models.RoboPortfolioTransaction{
+					RoboPortfolioID: asset.RoboPortfolioCategoryID,
+					TransactionType: "buy",
+					TotalAmount:     assetAmount,
+					Symbol:          &asset.Symbol,
+					Name:            &asset.Name,
+					Price:           &latestPrice,
+					SharesAmount:    &sharesToBuy,
+				}
+				if err := s.repo.CreateRoboPortfolioTransaction(transaction); err != nil {
+					errCh <- fmt.Errorf("failed to create transaction for asset %s: %w", asset.Symbol, err)
+				}
 			}(asset, amount*asset.Percentage/100)
 		}
+
 		wg.Wait()
 		close(errCh)
 		for err := range errCh {
@@ -601,7 +631,7 @@ func (s *roboPortfolioServiceImpl) sellOverPerformingAssets(portfolioCategories 
 
 			transaction := &models.RoboPortfolioTransaction{
 				RoboPortfolioID: asset.RoboPortfolioCategoryID,
-				TransactionType: "rebalance:sell",
+				TransactionType: "sell",
 				TotalAmount:     amountToSell,
 				Symbol:          &asset.Symbol,
 				Name:            &asset.Name,
@@ -667,7 +697,7 @@ func (s *roboPortfolioServiceImpl) buyUnderPerformingAssets(portfolioCategories 
 
 			transaction := &models.RoboPortfolioTransaction{
 				RoboPortfolioID: asset.RoboPortfolioCategoryID,
-				TransactionType: "rebalance:buy",
+				TransactionType: "buy",
 				TotalAmount:     amountToBuy,
 				Symbol:          &asset.Symbol,
 				Name:            &asset.Name,
