@@ -33,6 +33,7 @@ type Asset struct {
 
 type Assets struct {
 	Assets []Asset `json:"assets"`
+	Reason string  `json:"reason"`
 }
 
 type AssetAllocationResponse struct {

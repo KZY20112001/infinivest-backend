@@ -370,13 +370,13 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(ctx context.Context, userI
 	}
 
 	totalCash := &cashCategory.TotalAmount
-	totalSellAmount, err := s.sellOverPerformingAssets(overPerformingAssets, latestAssetPrices, totalValue, totalCash)
+	totalSellAmount, err := s.sellOverPerformingAssets(portfolioID, overPerformingAssets, latestAssetPrices, totalValue, totalCash)
 	if err != nil {
 		return nil, err
 	}
 
 	var failReason string = ""
-	totalBuyAmount, err := s.buyUnderPerformingAssets(underPerformingAssets, latestAssetPrices, totalValue, totalCash, &failReason)
+	totalBuyAmount, err := s.buyUnderPerformingAssets(portfolioID, underPerformingAssets, latestAssetPrices, totalValue, totalCash, &failReason)
 	if err != nil {
 		return nil, err
 	}
@@ -515,9 +515,9 @@ func (s *roboPortfolioServiceImpl) addMoneyToPortfolio(portfolio *models.RoboPor
 				if asset.SharesOwned > 0 {
 					asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
 				}
-
+				fmt.Print("current portfolio: ")
 				transaction := &models.RoboPortfolioTransaction{
-					RoboPortfolioID: asset.RoboPortfolioCategoryID,
+					RoboPortfolioID: portfolio.ID,
 					TransactionType: "buy",
 					TotalAmount:     assetAmount,
 					Symbol:          &asset.Symbol,
@@ -593,7 +593,7 @@ func (s *roboPortfolioServiceImpl) getPortfolioValue(portfolio *models.RoboPortf
 	return totalValue, totalInvested, nil
 }
 
-func (s *roboPortfolioServiceImpl) sellOverPerformingAssets(portfolioCategories []*models.RoboPortfolioAsset, latestAssetPricess map[string]float64, totalValue float64, totalCash *float64) (float64, error) {
+func (s *roboPortfolioServiceImpl) sellOverPerformingAssets(portfolioID uint, portfolioCategories []*models.RoboPortfolioAsset, latestAssetPricess map[string]float64, totalValue float64, totalCash *float64) (float64, error) {
 	totalSellAmount := 0.0
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -630,7 +630,7 @@ func (s *roboPortfolioServiceImpl) sellOverPerformingAssets(portfolioCategories 
 			mu.Unlock()
 
 			transaction := &models.RoboPortfolioTransaction{
-				RoboPortfolioID: asset.RoboPortfolioCategoryID,
+				RoboPortfolioID: portfolioID,
 				TransactionType: "sell",
 				TotalAmount:     amountToSell,
 				Symbol:          &asset.Symbol,
@@ -651,7 +651,7 @@ func (s *roboPortfolioServiceImpl) sellOverPerformingAssets(portfolioCategories 
 	return totalSellAmount, nil
 }
 
-func (s *roboPortfolioServiceImpl) buyUnderPerformingAssets(portfolioCategories []*models.RoboPortfolioAsset, latestAssetPricess map[string]float64, totalValue float64, totalCash *float64, failReason *string) (float64, error) {
+func (s *roboPortfolioServiceImpl) buyUnderPerformingAssets(portfolioID uint, portfolioCategories []*models.RoboPortfolioAsset, latestAssetPricess map[string]float64, totalValue float64, totalCash *float64, failReason *string) (float64, error) {
 	totalBuyAmount := 0.0
 	var mu sync.Mutex
 	var once sync.Once
@@ -696,7 +696,7 @@ func (s *roboPortfolioServiceImpl) buyUnderPerformingAssets(portfolioCategories 
 			}
 
 			transaction := &models.RoboPortfolioTransaction{
-				RoboPortfolioID: asset.RoboPortfolioCategoryID,
+				RoboPortfolioID: portfolioID,
 				TransactionType: "buy",
 				TotalAmount:     amountToBuy,
 				Symbol:          &asset.Symbol,
