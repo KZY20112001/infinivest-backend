@@ -382,7 +382,7 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(ctx context.Context, userI
 	}
 
 	// balance the cash
-	targetCash := totalValue * cashCategory.TotalPercentage / 100
+	targetCash := math.Floor(totalValue * cashCategory.TotalPercentage / 100)
 
 	if *totalCash < targetCash {
 		cashCategory.TotalAmount = *totalCash
