@@ -101,13 +101,14 @@ func (s *roboPortfolioServiceImpl) GetRoboPortfolioSummary(userID uint) (dto.Rob
 	if err != nil {
 		return dto.RoboPortfolioSummaryResponse{}, err
 	}
-	totalValue, err := s.getPortfolioValue(portfolio, make(map[string]float64))
+	totalValue, totalInvested, err := s.getPortfolioValue(portfolio, make(map[string]float64))
 	if err != nil {
 		return dto.RoboPortfolioSummaryResponse{}, err
 	}
 	return dto.RoboPortfolioSummaryResponse{
 		RebalanceFreq: *portfolio.RebalanceFreq,
-		TotalValue:    totalValue}, nil
+		TotalValue:    totalValue,
+		TotalInvested: totalInvested}, nil
 }
 
 func (s *roboPortfolioServiceImpl) AddMoneyToRoboPortfolio(ctx context.Context, userID uint, amount float64) (*models.RoboPortfolio, error) {
@@ -178,6 +179,21 @@ func (s *roboPortfolioServiceImpl) WithDrawMoneyFromRoboPortfolio(ctx context.Co
 	if amount <= cashCategory.TotalAmount {
 		cashCategory.TotalAmount -= amount
 		if err := s.repo.UpdateRoboPortfolio(portfolio); err != nil {
+			return 0, err
+		}
+
+		// unlock the portfolio after adding to queue
+		if err := s.repo.UnlockRoboPortfolio(portfolio); err != nil {
+			return 0, err
+		}
+
+		err = s.repo.CreateRoboPortfolioTransaction(&models.RoboPortfolioTransaction{
+			RoboPortfolioID: portfolio.ID,
+			TransactionType: "withdrawal",
+			TotalAmount:     amount,
+		})
+
+		if err != nil {
 			return 0, err
 		}
 		return amount, nil
@@ -293,13 +309,13 @@ func (s *roboPortfolioServiceImpl) DeleteRoboPortfolio(ctx context.Context, user
 		return err
 	}
 
-	totalValue, err := s.getPortfolioValue(portfolio, make(map[string]float64))
-	if err != nil {
-		return err
-	}
-	if totalValue > 0 {
-		return fmt.Errorf("portfolio %d for user %d has a total value of %.2f. Please withdraw all funds before deleting", portfolio.ID, userID, totalValue)
-	}
+	// totalValue, _, err := s.getPortfolioValue(portfolio, make(map[string]float64))
+	// if err != nil {
+	// 	return err
+	// }
+	// if totalValue > 0 {
+	// 	return fmt.Errorf("portfolio %d for user %d has a total value of %.2f. Please withdraw all funds before deleting", portfolio.ID, userID, totalValue)
+	// }
 	if err := s.redis.DeletePortfolioFromQueue(ctx, userID, portfolio.ID); err != nil {
 		return err
 	}
@@ -323,7 +339,7 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(ctx context.Context, userI
 
 	//get total portfolio value
 	latestAssetPrices := make(map[string]float64)
-	totalValue, err := s.getPortfolioValue(portfolio, latestAssetPrices)
+	totalValue, _, err := s.getPortfolioValue(portfolio, latestAssetPrices)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get portfolio value: %w", err)
 	}
@@ -354,26 +370,26 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(ctx context.Context, userI
 	}
 
 	totalCash := &cashCategory.TotalAmount
-	sellTransactions, totalSellAmount, err := s.sellOverPerformingAssets(overPerformingAssets, latestAssetPrices, totalValue, totalCash)
+	totalSellAmount, err := s.sellOverPerformingAssets(portfolioID, overPerformingAssets, latestAssetPrices, totalValue, totalCash)
 	if err != nil {
 		return nil, err
 	}
 
 	var failReason string = ""
-	buyTransactions, totalBuyAmount, err := s.buyUnderPerformingAssets(underPerformingAssets, latestAssetPrices, totalValue, totalCash, &failReason)
+	totalBuyAmount, err := s.buyUnderPerformingAssets(portfolioID, underPerformingAssets, latestAssetPrices, totalValue, totalCash, &failReason)
 	if err != nil {
 		return nil, err
 	}
 
 	// balance the cash
-	targetCash := totalValue * cashCategory.TotalPercentage / 100
+	targetCash := math.Floor(totalValue * cashCategory.TotalPercentage / 100)
 
 	if *totalCash < targetCash {
 		cashCategory.TotalAmount = *totalCash
 
 		// not enough cash, send a notification to the user
 		failReason = "Cash is under-allocated. Expected: " + fmt.Sprintf("%.2f", targetCash) + ", Available: " + fmt.Sprintf("%.2f", *totalCash)
-		if err := s.notificationService.AddNotification(ctx, userID, "alert", failReason); err != nil {
+		if err := s.notificationService.AddNotification(ctx, userID, "rebalance", failReason); err != nil {
 			log.Println("Failed to add notification:", err)
 		}
 		log.Printf("Warning: Cash is under-allocated. Expected: %.2f, Available: %.2f\n", targetCash, *totalCash)
@@ -424,7 +440,7 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(ctx context.Context, userI
 		return nil, err
 	}
 
-	if err := s.repo.CreateRebalanceEvent(rebalanceEvent, sellTransactions, buyTransactions); err != nil {
+	if err := s.repo.CreateRebalanceEvent(rebalanceEvent); err != nil {
 		return nil, err
 	}
 
@@ -437,7 +453,7 @@ func (s *roboPortfolioServiceImpl) RebalancePortfolio(ctx context.Context, userI
 	var message string = "Portfolio rebalanced successfully!"
 	if failReason != "" {
 		message = "Portfolio rebalanced with issues!"
-		if err := s.notificationService.AddNotification(ctx, userID, "alert", failReason); err != nil {
+		if err := s.notificationService.AddNotification(ctx, userID, "rebalance", failReason); err != nil {
 			log.Println("Failed to add notification:", err)
 		}
 	}
@@ -493,13 +509,28 @@ func (s *roboPortfolioServiceImpl) addMoneyToPortfolio(portfolio *models.RoboPor
 					return
 				}
 
-				asset.SharesOwned += assetAmount / latestPrice
+				sharesToBuy := assetAmount / latestPrice
+				asset.SharesOwned += sharesToBuy
 				asset.TotalInvested += assetAmount
 				if asset.SharesOwned > 0 {
 					asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
 				}
+				fmt.Print("current portfolio: ")
+				transaction := &models.RoboPortfolioTransaction{
+					RoboPortfolioID: portfolio.ID,
+					TransactionType: "buy",
+					TotalAmount:     assetAmount,
+					Symbol:          &asset.Symbol,
+					Name:            &asset.Name,
+					Price:           &latestPrice,
+					SharesAmount:    &sharesToBuy,
+				}
+				if err := s.repo.CreateRoboPortfolioTransaction(transaction); err != nil {
+					errCh <- fmt.Errorf("failed to create transaction for asset %s: %w", asset.Symbol, err)
+				}
 			}(asset, amount*asset.Percentage/100)
 		}
+
 		wg.Wait()
 		close(errCh)
 		for err := range errCh {
@@ -514,16 +545,19 @@ func (s *roboPortfolioServiceImpl) addMoneyToPortfolio(portfolio *models.RoboPor
 	return nil
 }
 
-func (s *roboPortfolioServiceImpl) getPortfolioValue(portfolio *models.RoboPortfolio, latestAssetPrices map[string]float64) (float64, error) {
+func (s *roboPortfolioServiceImpl) getPortfolioValue(portfolio *models.RoboPortfolio, latestAssetPrices map[string]float64) (float64, float64, error) {
 	var mu sync.Mutex
 
 	totalValue := 0.0
+	totalInvested := 0.0
 	for _, category := range portfolio.Categories {
 		if category.Name == "cash" {
 			totalValue += category.TotalAmount
+			totalInvested += category.TotalAmount
 			continue
 		}
 		categoryValue := 0.0
+		categoryInvested := 0.0
 		var wg sync.WaitGroup
 		errCh := make(chan error, len(category.Assets))
 		for _, asset := range category.Assets {
@@ -541,6 +575,7 @@ func (s *roboPortfolioServiceImpl) getPortfolioValue(portfolio *models.RoboPortf
 				mu.Lock()
 				latestAssetPrices[asset.Symbol] = latestPrice
 				categoryValue += assetValue
+				categoryInvested += asset.TotalInvested
 				mu.Unlock()
 			}(asset)
 		}
@@ -548,17 +583,17 @@ func (s *roboPortfolioServiceImpl) getPortfolioValue(portfolio *models.RoboPortf
 		wg.Wait()
 		close(errCh)
 		for err := range errCh {
-			return 0, err
+			return 0, 0, err
 		}
 		category.TotalAmount = categoryValue
 		totalValue += categoryValue
+		totalInvested += categoryInvested
 	}
 
-	return totalValue, nil
+	return totalValue, totalInvested, nil
 }
 
-func (s *roboPortfolioServiceImpl) sellOverPerformingAssets(portfolioCategories []*models.RoboPortfolioAsset, latestAssetPricess map[string]float64, totalValue float64, totalCash *float64) ([]*models.RoboPortfolioTransaction, float64, error) {
-	var transactions []*models.RoboPortfolioTransaction
+func (s *roboPortfolioServiceImpl) sellOverPerformingAssets(portfolioID uint, portfolioCategories []*models.RoboPortfolioAsset, latestAssetPricess map[string]float64, totalValue float64, totalCash *float64) (float64, error) {
 	totalSellAmount := 0.0
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -589,8 +624,13 @@ func (s *roboPortfolioServiceImpl) sellOverPerformingAssets(portfolioCategories 
 				asset.AvgBuyPrice = asset.TotalInvested / asset.SharesOwned
 			}
 
+			mu.Lock()
+			totalSellAmount += amountToSell
+			*totalCash += amountToSell
+			mu.Unlock()
+
 			transaction := &models.RoboPortfolioTransaction{
-				RoboPortfolioID: asset.RoboPortfolioCategoryID,
+				RoboPortfolioID: portfolioID,
 				TransactionType: "sell",
 				TotalAmount:     amountToSell,
 				Symbol:          &asset.Symbol,
@@ -598,24 +638,20 @@ func (s *roboPortfolioServiceImpl) sellOverPerformingAssets(portfolioCategories 
 				Price:           &latestPrice,
 				SharesAmount:    &sharesToSell,
 			}
-
-			mu.Lock()
-			transactions = append(transactions, transaction)
-			totalSellAmount += amountToSell
-			*totalCash += amountToSell
-			mu.Unlock()
+			if err := s.repo.CreateRoboPortfolioTransaction(transaction); err != nil {
+				errCh <- fmt.Errorf("failed to create transaction for asset %s: %w", asset.Symbol, err)
+			}
 		}(asset)
 	}
 	wg.Wait()
 	close(errCh)
 	for err := range errCh {
-		return nil, 0, err
+		return 0, err
 	}
-	return transactions, totalSellAmount, nil
+	return totalSellAmount, nil
 }
 
-func (s *roboPortfolioServiceImpl) buyUnderPerformingAssets(portfolioCategories []*models.RoboPortfolioAsset, latestAssetPricess map[string]float64, totalValue float64, totalCash *float64, failReason *string) ([]*models.RoboPortfolioTransaction, float64, error) {
-	var transactions []*models.RoboPortfolioTransaction
+func (s *roboPortfolioServiceImpl) buyUnderPerformingAssets(portfolioID uint, portfolioCategories []*models.RoboPortfolioAsset, latestAssetPricess map[string]float64, totalValue float64, totalCash *float64, failReason *string) (float64, error) {
 	totalBuyAmount := 0.0
 	var mu sync.Mutex
 	var once sync.Once
@@ -660,7 +696,7 @@ func (s *roboPortfolioServiceImpl) buyUnderPerformingAssets(portfolioCategories 
 			}
 
 			transaction := &models.RoboPortfolioTransaction{
-				RoboPortfolioID: asset.RoboPortfolioCategoryID,
+				RoboPortfolioID: portfolioID,
 				TransactionType: "buy",
 				TotalAmount:     amountToBuy,
 				Symbol:          &asset.Symbol,
@@ -669,16 +705,16 @@ func (s *roboPortfolioServiceImpl) buyUnderPerformingAssets(portfolioCategories 
 				SharesAmount:    &sharesToBuy,
 			}
 
-			mu.Lock()
-			transactions = append(transactions, transaction)
-			mu.Unlock()
+			if err := s.repo.CreateRoboPortfolioTransaction(transaction); err != nil {
+				errCh <- fmt.Errorf("failed to create transaction for asset %s: %w", asset.Symbol, err)
+			}
 		}(asset)
 	}
 
 	wg.Wait()
 	close(errCh)
 	for err := range errCh {
-		return nil, 0, err
+		return 0, err
 	}
-	return transactions, totalBuyAmount, nil
+	return totalBuyAmount, nil
 }

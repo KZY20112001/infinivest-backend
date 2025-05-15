@@ -162,12 +162,6 @@ func (r *postgresManualPortfolioRepo) GetManualPortfolioTransactions(userID, por
 		query = query.Limit(limit)
 	}
 
-	if err := query.Find(&transactions).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, gorm.ErrRecordNotFound
-		}
-		return nil, err
-	}
-
-	return transactions, nil
+	err := query.Order("manual_portfolio_transactions.created_at DESC").Find(&transactions).Error
+	return transactions, err
 }

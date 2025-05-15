@@ -38,10 +38,9 @@ type RebalanceEvent struct {
 	gorm.Model
 	RoboPortfolioID uint `gorm:"not null"`
 
-	Transactions    []*RoboPortfolioTransaction `json:"roboPortfolioTransactions"`
-	TotalBuyAmount  float64                     `json:"totalBuyAmount"`
-	TotalSellAmount float64                     `json:"totalSellAmount"`
-	NetChange       float64                     `json:"netChange"`
+	TotalBuyAmount  float64 `json:"totalBuyAmount"`
+	TotalSellAmount float64 `json:"totalSellAmount"`
+	NetChange       float64 `json:"netChange"`
 
 	Success bool    `json:"success"` // was this rebalance completed?
 	Reason  *string `json:"reason"`  // optional error or reason (e.g. "insufficient funds")

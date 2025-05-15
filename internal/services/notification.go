@@ -10,6 +10,7 @@ import (
 type NotificationService interface {
 	GetNotifications(ctx context.Context, userID, limit uint) ([]string, error)
 	AddNotification(ctx context.Context, userID uint, notiType, message string) error
+	ClearNotifications(ctx context.Context, userID uint) error
 }
 
 type notificationServiceImpl struct {
@@ -26,6 +27,10 @@ func (ns *notificationServiceImpl) GetNotifications(ctx context.Context, userID,
 
 func (ns *notificationServiceImpl) AddNotification(ctx context.Context, userID uint, notiType, message string) error {
 	time := time.Now().Format("2006-01-02 15:04:05")
-	notification := time + ": " + notiType + ": " + message
+	notification := time + "; " + notiType + "; " + message
 	return ns.redis.AddNotification(ctx, userID, notification)
+}
+
+func (ns *notificationServiceImpl) ClearNotifications(ctx context.Context, userID uint) error {
+	return ns.redis.ClearNotifications(ctx, userID)
 }

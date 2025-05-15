@@ -53,7 +53,7 @@ func (h *ManualPortfolioHandler) GetManualPortfolio(c *gin.Context) {
 func (h *ManualPortfolioHandler) GetPortfolioValue(c *gin.Context) {
 	portfolioName := c.Param("name")
 	userID := c.GetUint("id")
-	portfolioValue, err := h.service.GetPorfolioValue(userID, portfolioName)
+	portfolioValue, _, err := h.service.GetPorfolioValue(userID, portfolioName)
 	if err != nil {
 		commons.HandleError(c, err)
 		return

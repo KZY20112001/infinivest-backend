@@ -12,7 +12,9 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 	notificationGroup := portfolioGroup.Group("/notifications")
 	{
 		notificationGroup.GET("/", nh.GetNotifications)
+		notificationGroup.DELETE("/", nh.ClearNotifications)
 	}
+
 	roboAdvisorGroup := portfolioGroup.Group("/robo-portfolio")
 	{
 		roboAdvisorGroup.GET("/details", rh.GetRoboPortfolioDetails)
@@ -34,6 +36,8 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 		roboAdvisorGroup.GET("/rebalance/details", rh.GetRebalanceEvents)
 		roboAdvisorGroup.PATCH("/rebalance/seen", rh.UpdateLastSeenRebalanceEvent)
 
+		// testing only
+		roboAdvisorGroup.GET("/rebalance", rh.RebalanceRoboPortfolio)
 	}
 
 	manualGroup := portfolioGroup.Group("/manual-portfolio")
@@ -54,6 +58,5 @@ func RegisterPortfolioRoutes(r *gin.Engine, rh *handlers.RoboPortfolioHandler, m
 		manualGroup.PUT("/:name/sell", mh.SellAssetForManualPortfolio)
 
 		manualGroup.GET("/:name/transactions", mh.GetManualPortfolioTransactions)
-
 	}
 }

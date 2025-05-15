@@ -20,11 +20,7 @@ type RoboPortfolioRepo interface {
 	CreateRoboPortfolioTransaction(transaction *models.RoboPortfolioTransaction) error
 	GetRoboPortfolioTransactions(userID uint, limit int) ([]*models.RoboPortfolioTransaction, error)
 
-	CreateRebalanceEvent(
-		rebalanceEvent *models.RebalanceEvent,
-		sellTransactions []*models.RoboPortfolioTransaction,
-		buyTransactions []*models.RoboPortfolioTransaction,
-	) error
+	CreateRebalanceEvent(rebalanceEvent *models.RebalanceEvent) error
 
 	GetRebalanceEvents(portfolioID uint, lastSeen time.Time) ([]*models.RebalanceEvent, error)
 	LockRoboPortfolio(portfolio *models.RoboPortfolio) error
@@ -193,33 +189,18 @@ func (r *postgresRoboPortfolioRepo) GetRoboPortfolioTransactions(userID uint, li
 	return transactions, err
 }
 
-func (r *postgresRoboPortfolioRepo) CreateRebalanceEvent(
-	rebalanceEvent *models.RebalanceEvent,
-	sellTransactions []*models.RoboPortfolioTransaction,
-	buyTransactions []*models.RoboPortfolioTransaction,
-) error {
-
-	tx := r.db.Begin()
-	if tx.Error != nil {
-		return tx.Error
+func (r *postgresRoboPortfolioRepo) CreateRebalanceEvent(rebalanceEvent *models.RebalanceEvent) error {
+	if rebalanceEvent == nil {
+		return commons.ErrNil
 	}
 
-	if err := tx.Create(rebalanceEvent).Error; err != nil {
-		tx.Rollback()
+	if err := r.db.Create(&rebalanceEvent).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return gorm.ErrDuplicatedKey
+		}
 		return err
 	}
-
-	allTransactions := append(sellTransactions, buyTransactions...)
-	for _, transaction := range allTransactions {
-		transaction.RebalanceEventID = &rebalanceEvent.ID
-		if err := tx.Create(transaction).Error; err != nil {
-			tx.Rollback()
-			return err
-		}
-	}
-
-	return tx.Commit().Error
-
+	return nil
 }
 
 func (r *postgresRoboPortfolioRepo) GetRebalanceEvents(portfolioID uint, lastSeen time.Time) ([]*models.RebalanceEvent, error) {
